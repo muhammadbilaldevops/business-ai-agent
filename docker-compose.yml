@@ -1,0 +1,13 @@
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    environment:
+      LOCALOPS_DATA_DIR: /app/data
+      LOCALOPS_OLLAMA_URL: http://ollama:11434
+    volumes: ["./data:/app/data"]
+  ollama:
+    image: ollama/ollama:latest
+    volumes: ["ollama:/root/.ollama"]
+volumes:
+  ollama:
