@@ -1,0 +1,12 @@
+{
+  "name": "localops-ai",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-web.mjs",
+    "typecheck": "cd apps/web && tsc --noEmit",
+    "dev": "npm --prefix apps/web run dev"
+  },
+  "packageManager": "pnpm@11.25.0"
+}

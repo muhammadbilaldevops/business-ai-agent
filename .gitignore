@@ -9,3 +9,24 @@ data/documents/*
 data/datasets/*
 !data/documents/.gitkeep
 !data/datasets/.gitkeep
+# Generated application state and local tooling
+node_modules/
+dist/
+out/
+.next/
+.sites-runtime/
+.wrangler/
+.mypy_cache/
+*.egg-info/
+*.tsbuildinfo
+.pytest-tmp/
+pytest-of-root/
+tmp*
+data/runtime/
+data/models/
+playwright-report/
+test-results/
+.env.*
+!.env.example
+!.env.test.example
+!.env.production.example

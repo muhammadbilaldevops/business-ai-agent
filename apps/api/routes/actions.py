@@ -1,32 +1,76 @@
 import json
-from uuid import uuid4
-from fastapi import APIRouter, HTTPException
+
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
-from localops.store import db
+
+from apps.api.dependencies import services
 
 router = APIRouter(tags=["approvals"])
+
 
 class ActionRequest(BaseModel):
     action_type: str = Field(pattern="^(create_report|create_task)$")
     payload: dict
 
-@router.post("/actions")
-def request_action(request: ActionRequest) -> dict[str, str]:
-    approval_id = str(uuid4())
-    with db() as connection:
-        connection.execute("INSERT INTO approvals VALUES (?, ?, ?, ?)", (approval_id, request.action_type, json.dumps(request.payload), "pending"))
-        connection.execute("INSERT INTO audit(event, detail) VALUES (?, ?)", ("action_requested", approval_id))
-    return {"approval_id": approval_id, "status": "pending"}
 
 class Decision(BaseModel):
     approved: bool
 
+
+class ToolDecision(Decision):
+    approval_id: str
+
+
+@router.post("/actions")
+def request_action(request: ActionRequest, svc=Depends(services)):
+    return svc.registry.request(request.action_type, request.payload)
+
+
+@router.get("/approvals")
+def approvals(svc=Depends(services)):
+    return [
+        {
+            **r,
+            "payload": json.loads(r["payload"]),
+            "result": json.loads(r["result"]) if r["result"] else None,
+        }
+        for r in svc.store.rows("SELECT * FROM requests ORDER BY created_at DESC")
+    ]
+
+
 @router.post("/approvals/{approval_id}")
-def decide(approval_id: str, decision: Decision) -> dict[str, str]:
-    status = "approved" if decision.approved else "rejected"
-    with db() as connection:
-        changed = connection.execute("UPDATE approvals SET status=? WHERE id=? AND status='pending'", (status, approval_id)).rowcount
-        if not changed:
-            raise HTTPException(404, "Pending approval not found")
-        connection.execute("INSERT INTO audit(event, detail) VALUES (?, ?)", (f"action_{status}", approval_id))
-    return {"approval_id": approval_id, "status": status}
+def decide(approval_id: str, decision: Decision, svc=Depends(services)):
+    return svc.agent.resume(approval_id, decision.approved)
+
+
+@router.post("/tools/approve")
+def approve_tool(decision: ToolDecision, svc=Depends(services)):
+    return svc.agent.resume(decision.approval_id, decision.approved)
+
+
+@router.get("/tools")
+def tools(svc=Depends(services)):
+    return svc.registry.describe()
+
+
+@router.get("/tasks")
+def tasks(svc=Depends(services)):
+    return svc.store.rows("SELECT * FROM tasks ORDER BY created_at DESC")
+
+
+@router.get("/reports")
+def reports(svc=Depends(services)):
+    return svc.store.rows("SELECT id,title,created_at FROM reports ORDER BY created_at DESC")
+
+
+@router.get("/reports/{report_id}")
+def report(report_id: str, svc=Depends(services)):
+    rows = svc.store.rows("SELECT content FROM reports WHERE id=?", (report_id,))
+    if not rows:
+        raise HTTPException(404, "Report not found")
+    return PlainTextResponse(
+        rows[0]["content"],
+        media_type="text/markdown",
+        headers={"Content-Disposition": 'attachment; filename="operations-report.md"'},
+    )

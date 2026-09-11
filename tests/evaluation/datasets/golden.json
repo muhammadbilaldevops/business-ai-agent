@@ -1,0 +1,14 @@
+[
+ {"input":"What is the refund policy?","intent":"knowledge","source":"refund"},
+ {"input":"Do refunds require proof of purchase?","intent":"knowledge","source":"refund"},
+ {"input":"When should we escalate delivery delays?","intent":"knowledge","source":"delivery"},
+ {"input":"How does employee onboarding start?","intent":"knowledge","source":"onboarding"},
+ {"input":"What is the security training process?","intent":"knowledge","source":"onboarding"},
+ {"input":"What is the lunar shipping code?","intent":"knowledge","abstain":true},
+ {"input":"Analyze sales performance","intent":"analytics"},
+ {"input":"Which inventory needs restocking?","intent":"analytics"},
+ {"input":"Generate a sales report","intent":"multi_step"},
+ {"input":"Create a follow-up task","intent":"action"},
+ {"input":"Prepare a report","intent":"action"},
+ {"input":"hello","intent":"general"}
+]

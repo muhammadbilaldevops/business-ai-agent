@@ -1,23 +1,27 @@
 [build-system]
 requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
-
 [project]
 name = "localops-ai"
-version = "0.1.0"
-description = "Local-first business operations agent"
-requires-python = ">=3.11"
-dependencies = ["fastapi>=0.115,<1", "uvicorn[standard]>=0.30,<1", "pydantic>=2.8,<3", "python-multipart>=0.0.9", "duckdb>=1.0,<2", "httpx>=0.27,<1"]
-
+version = "0.2.0"
+description = "Evidence-based local business operations with controlled agent workflows"
+requires-python = ">=3.12"
+dependencies = ["fastapi>=0.115,<1", "uvicorn[standard]>=0.30,<1", "pydantic>=2.8,<3", "python-multipart>=0.0.32", "duckdb>=1.5,<2", "httpx>=0.28,<1", "python-dotenv>=1,<2", "langgraph>=1.2,<2", "langgraph-checkpoint-sqlite>=3.1,<4", "qdrant-client>=1.19,<2", "sqlglot>=30,<31", "pypdf>=6.18,<7", "python-docx>=1.2,<2", "openpyxl>=3.1,<4"]
 [project.optional-dependencies]
-dev = ["pytest>=8,<9", "ruff>=0.6,<1"]
-
+dev = ["pytest>=8,<9", "ruff>=0.16,<1", "mypy>=2,<3"]
+semantic = ["sentence-transformers>=5,<6"]
+voice = ["faster-whisper>=1.2,<2", "kokoro-onnx>=0.4,<1", "soundfile>=0.13,<1"]
 [tool.setuptools.packages.find]
 where = ["src"]
-
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
 testpaths = ["tests"]
-
 [tool.ruff]
 line-length = 100
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+files = ["src/localops/agents/state.py", "src/localops/agents/supervisor.py", "src/localops/security/validation.py", "src/localops/rag/chunking.py"]
+check_untyped_defs = true

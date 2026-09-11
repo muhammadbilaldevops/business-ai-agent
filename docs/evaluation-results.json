@@ -1,0 +1,97 @@
+{
+  "mode": "extractive",
+  "scope": "Routing and lexical source recall; no generative faithfulness or voice measurement",
+  "python": "3.12.14",
+  "machine": "x86_64",
+  "cases": 12,
+  "passed": 12,
+  "pass_rate": 1.0,
+  "latency_ms": {
+    "p50": 0.12784749992533762,
+    "p95": 0.7197310001174628
+  },
+  "results": [
+    {
+      "input": "What is the refund policy?",
+      "passed": true,
+      "intent": "knowledge",
+      "sources": [
+        "refund"
+      ]
+    },
+    {
+      "input": "Do refunds require proof of purchase?",
+      "passed": true,
+      "intent": "knowledge",
+      "sources": [
+        "refund"
+      ]
+    },
+    {
+      "input": "When should we escalate delivery delays?",
+      "passed": true,
+      "intent": "knowledge",
+      "sources": [
+        "delivery"
+      ]
+    },
+    {
+      "input": "How does employee onboarding start?",
+      "passed": true,
+      "intent": "knowledge",
+      "sources": [
+        "onboarding"
+      ]
+    },
+    {
+      "input": "What is the security training process?",
+      "passed": true,
+      "intent": "knowledge",
+      "sources": [
+        "onboarding"
+      ]
+    },
+    {
+      "input": "What is the lunar shipping code?",
+      "passed": true,
+      "intent": "knowledge",
+      "sources": []
+    },
+    {
+      "input": "Analyze sales performance",
+      "passed": true,
+      "intent": "analytics",
+      "sources": []
+    },
+    {
+      "input": "Which inventory needs restocking?",
+      "passed": true,
+      "intent": "analytics",
+      "sources": []
+    },
+    {
+      "input": "Generate a sales report",
+      "passed": true,
+      "intent": "multi_step",
+      "sources": []
+    },
+    {
+      "input": "Create a follow-up task",
+      "passed": true,
+      "intent": "action",
+      "sources": []
+    },
+    {
+      "input": "Prepare a report",
+      "passed": true,
+      "intent": "action",
+      "sources": []
+    },
+    {
+      "input": "hello",
+      "passed": true,
+      "intent": "general",
+      "sources": []
+    }
+  ]
+}

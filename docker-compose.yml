@@ -1,13 +1,28 @@
 services:
-  api:
+  localops:
     build: .
-    ports: ["8000:8000"]
+    ports:
+      - "127.0.0.1:8000:8000"
     environment:
-      LOCALOPS_DATA_DIR: /app/data
+      LOCALOPS_MODE: ${LOCALOPS_MODE:-extractive}
+      LOCALOPS_DATA_DIR: /app/data/runtime
       LOCALOPS_OLLAMA_URL: http://ollama:11434
-    volumes: ["./data:/app/data"]
+      LOCALOPS_MODEL: ${LOCALOPS_MODEL:-llama3.1:8b}
+      LOCALOPS_API_KEY: ${LOCALOPS_API_KEY:-}
+      LANGSMITH_TRACING: "false"
+      HF_HUB_OFFLINE: "1"
+    volumes:
+      - localops-data:/app/data/runtime
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    restart: unless-stopped
   ollama:
-    image: ollama/ollama:latest
-    volumes: ["ollama:/root/.ollama"]
+    image: ${OLLAMA_IMAGE:-ollama/ollama:latest}
+    profiles: [ai]
+    volumes:
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
 volumes:
-  ollama:
+  localops-data:
+  ollama-models:
