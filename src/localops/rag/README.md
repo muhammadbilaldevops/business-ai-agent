@@ -1,3 +1,3 @@
-# rag
+# 🔎 Retrieval-augmented generation
 
-`loaders.py` extracts bounded text/tables; `chunking.py` preserves source metadata; `retriever.py` implements BM25 and optional local dense retrieval, rank fusion and reranking. Model paths are explicit; runtime does not download them.
+`loaders.py` ingests text, `chunking.py` creates bounded passages, and `retriever.py` ranks evidence using lexical/BM25 and optional local vector fusion/reranking. Only selected evidence is sent to a model and citations are retained.

@@ -1,3 +1,11 @@
-# api
+# 🚀 API service
 
-FastAPI composition root and route handlers. `main.py` applies request boundaries and mounts the built web export. Run `uvicorn apps.api.main:app --host 127.0.0.1 --port 8000` from the repository root.
+FastAPI composition lives in `main.py`; dependency injection and authentication are in `dependencies.py`. Routes cover health, chat, documents, analytics, actions, settings, and voice. The service delegates domain behavior to `src/localops` and is designed for Render deployment through `render.yaml`.
+
+```mermaid
+flowchart LR
+ HTTP[HTTP request] --> Auth[API key + CORS + limits]
+ Auth --> Route[Route handler]
+ Route --> Core[src/localops services]
+ Core --> Reply[Typed response]
+```

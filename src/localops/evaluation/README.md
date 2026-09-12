@@ -1,3 +1,3 @@
-# evaluation
+# 📏 Evaluation
 
-`runner.py` evaluates curated deterministic routes and lexical evidence retrieval. It records observations rather than invented accuracy claims. Run `python scripts/run_evaluation.py` at the repository root.
+`runner.py` executes reproducible evaluation cases for routing and retrieval quality. Golden datasets live under `tests/evaluation/datasets` and can run in CI.

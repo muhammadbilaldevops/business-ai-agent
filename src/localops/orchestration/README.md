@@ -1,3 +1,3 @@
-# orchestration
+# 🕸️ Orchestration
 
-`graph.py` routes requests, retrieves evidence, computes analytics, stages actions and resumes durable human approvals. SQLite checkpoints are separate from the business database. Test with `pytest tests/integration/test_workflows.py`.
+`graph.py` defines the multi-step workflow: classify → retrieve/analyze → call model/tool → validate → interrupt for approval → execute or reject. The model cannot bypass approval decisions.

@@ -1,3 +1,3 @@
-# agents
+# 🤖 Agents
 
-`state.py` defines serializable graph state. `supervisor.py` classifies business requests with auditable rules. Node implementations are composed in `orchestration/graph.py`.
+`state.py` defines typed workflow state. `supervisor.py` classifies requests and routes them to knowledge, analytics, general chat, or action paths. Routing is deterministic before any model call.

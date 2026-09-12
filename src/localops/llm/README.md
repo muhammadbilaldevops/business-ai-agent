@@ -1,3 +1,3 @@
-# llm
+# 🧪 Model adapters
 
-Local Ollama client and evidence instructions. Streaming, timeout, bounded retry, local endpoint validation and circuit breaker avoid uncontrolled fallback to external inference. Mock HTTP contract tests are in `tests/integration/test_llm.py`.
+`gemini_client.py` calls Gemini over HTTP with server-only keys, streaming, retries, and timeouts. `ollama_client.py` supports local generated answers. The orchestration layer can swap adapters without changing UI contracts.

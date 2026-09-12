@@ -1,3 +1,3 @@
-# security
+# 🔐 Security
 
-Filename/path validation and total request-body limits. SQL boundaries live beside the DuckDB runner. See `docs/security.md` and `tests/security/` for tested guarantees and limitations.
+`validation.py` checks identifiers and input shapes; `body_limit.py` bounds request size. The package also constrains workspace paths, query capabilities, file sizes, and result sizes.

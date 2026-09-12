@@ -156,3 +156,33 @@ Uploaded text is untrusted evidence. Actions require human approval. Requests, f
 ## 🤝 Contributing and license
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md), run focused tests, and include evidence for quality claims. See [LICENSE](LICENSE).
+
+## 📚 Folder documentation map
+
+Each engineering area has its own guide so a reviewer can browse the repository without guessing where a responsibility lives:
+
+- [`apps/web/README.md`](apps/web/README.md) — frontend runtime and UI structure
+- [`apps/web/lib/README.md`](apps/web/lib/README.md) — browser engine, readers, retrieval, and voice
+- [`apps/api/README.md`](apps/api/README.md) — FastAPI service and endpoints
+- [`apps/api/routes/README.md`](apps/api/routes/README.md) — route-by-route contract map
+- [`src/localops/README.md`](src/localops/README.md) — reusable Python domain package
+- [`src/localops/agents/README.md`](src/localops/agents/README.md) — agent state and supervision
+- [`src/localops/orchestration/README.md`](src/localops/orchestration/README.md) — workflow graph
+- [`src/localops/rag/README.md`](src/localops/rag/README.md) — retrieval pipeline
+- [`src/localops/llm/README.md`](src/localops/llm/README.md) — Gemini and Ollama adapters
+- [`src/localops/tools/README.md`](src/localops/tools/README.md) — safe business tools
+- [`src/localops/security/README.md`](src/localops/security/README.md) — validation boundaries
+- [`src/localops/voice/README.md`](src/localops/voice/README.md) — speech adapters
+- [`src/localops/evaluation/README.md`](src/localops/evaluation/README.md) — evaluation runner
+- [`tests/README.md`](tests/README.md) — test strategy and commands
+
+### 🔭 Future improvements
+
+1. Add authenticated multi-user workspaces with encrypted object storage.
+2. Add streaming Gemini responses with token-level citations and confidence signals.
+3. Add multilingual Whisper models and server-side voice fallback.
+4. Add background ingestion jobs, vector database persistence, and document versioning.
+5. Add richer spreadsheet formulas, dashboard exports, and scheduled reports.
+6. Add approval webhooks, audit-log search, role-based tool permissions, and rate limits.
+7. Add observability with traces, latency dashboards, error budgets, and model evaluations in CI.
+8. Add automated deployment previews, custom domains, backup/restore, and disaster recovery.

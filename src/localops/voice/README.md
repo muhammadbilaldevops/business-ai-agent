@@ -1,3 +1,3 @@
-# voice
+# 🎙️ Voice adapters
 
-`service.py` loads existing Faster-Whisper and Kokoro ONNX assets. It accepts short clips and returns transcripts/WAV bytes. Real model validation is pending; see `docs/voice.md`.
+`service.py` contains optional server-side STT/TTS integration points. The deployed frontend prefers on-device Whisper so microphone transcription does not depend on a browser speech provider or a hosted speech key.
