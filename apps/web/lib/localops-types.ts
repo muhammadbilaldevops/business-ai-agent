@@ -20,6 +20,8 @@ export type Citation = {
   page?: number;
   section?: string;
   score?: number;
+  /** Internal position used to continue a document answer in browser-only mode. */
+  chunk_index?: number;
 };
 export type Analysis = {
   columns: string[];

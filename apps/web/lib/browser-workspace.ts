@@ -223,7 +223,7 @@ export const browserWorkspace = {
         "Review the proposed action in Approvals. Nothing has been executed yet.";
       result.trajectory.push("action_agent");
     } else if (!analytical) {
-      const grounded = answerDocuments(query, state().documents);
+      const grounded = answerDocuments(query, state().documents, state().messages);
       result.answer = grounded.answer;
       result.citations = grounded.citations;
       result.trajectory.push("knowledge_agent");

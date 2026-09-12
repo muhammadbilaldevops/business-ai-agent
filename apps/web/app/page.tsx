@@ -86,7 +86,7 @@ import type {
 import { AnalysisResult } from "@/components/analysis-result";
 import { VoiceControls } from "@/components/voice-controls";
 const REPO =
-  "https://github.com/muhammadbilaldevops/Ai-Agent-Industry-Level-Project";
+  "https://github.com/muhammadbilaldevops/business-ai-agent";
 const views = [
   { name: "Workspace", icon: MessageSquare },
   { name: "Knowledge base", icon: BookOpen },
