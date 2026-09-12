@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from apps.api.dependencies import services
+from localops.llm.ollama_client import ModelError
 
 router = APIRouter(tags=["chat"])
 
@@ -57,11 +58,11 @@ def stream(request: ChatRequest, svc=Depends(services)):
                 request.message, request.conversation_id, request.dataset_id, emit=emit
             )
             events.put(("result", result), timeout=5)
-        except Exception:
+        except Exception as exc:
             events.put(
                 (
                     "error",
-                    {"message": "Response could not finish. Check the local model and retry."},
+                    {"message": str(exc) if isinstance(exc, ModelError) else "Response could not finish. Please retry."},
                 ),
                 timeout=5,
             )

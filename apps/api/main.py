@@ -13,6 +13,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
 from apps.api.routes import actions, analytics, chat, documents, health, settings, voice
@@ -33,7 +34,7 @@ def create_app(config: Settings | None = None):
         yield
         app.state.services.close()
 
-    app = FastAPI(title="LocalOps AI", version="0.2.0", lifespan=lifespan)
+    app = FastAPI(title="Business AI Agent", version="0.2.0", lifespan=lifespan)
     app.add_middleware(BodyLimitMiddleware, maximum=config.max_upload_bytes + 65536)
     requests = deque()
 
@@ -72,17 +73,17 @@ def create_app(config: Settings | None = None):
                 "/evaluations",
             )
         )
-        if is_api and path != "/api/health":
+        if is_api and path != "/api/health" and request.method != "OPTIONS":
             origin = request.headers.get("origin")
-            if origin and origin.rstrip("/") != str(request.base_url).rstrip("/"):
+            if origin and origin.rstrip("/") != str(request.base_url).rstrip("/") and origin.rstrip("/") not in config.allowed_origins:
                 return error(
-                    request, "ORIGIN_REJECTED", "Open the app from the same origin as the API", 403
+                    request, "ORIGIN_REJECTED", "This website is not an allowed workspace origin", 403
                 )
             if config.api_key:
                 supplied = request.headers.get("authorization", "").removeprefix("Bearer ")
                 if not secrets.compare_digest(supplied, config.api_key):
                     return error(
-                        request, "UNAUTHORIZED", "A valid local API token is required", 401
+                        request, "UNAUTHORIZED", "Enter your workspace access token in Settings", 401
                     )
             while requests and started - requests[0] > 60:
                 requests.popleft()
@@ -152,6 +153,13 @@ def create_app(config: Settings | None = None):
     web = Path(__file__).resolve().parents[2] / "dist"
     if web.is_dir() and (web / "index.html").exists():
         app.mount("/", StaticFiles(directory=web, html=True), name="web")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(config.allowed_origins),
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
+        expose_headers=["X-Request-ID"],
+    )
     return app
 
 

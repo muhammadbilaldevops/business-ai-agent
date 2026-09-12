@@ -1,4 +1,4 @@
-import { demo } from "./demo";
+import { browserWorkspace } from "./browser-workspace";
 import type {
   Snapshot,
   Answer,
@@ -8,6 +8,10 @@ import type {
   Dataset,
   Analysis,
 } from "./localops-types";
+const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "/api").replace(
+  /\/$/,
+  "",
+);
 export class LocalOpsClient {
   constructor(
     public local = false,
@@ -18,7 +22,7 @@ export class LocalOpsClient {
     if (this.token) headers.set("Authorization", `Bearer ${this.token}`);
     if (init.body && !(init.body instanceof FormData))
       headers.set("Content-Type", "application/json");
-    const r = await fetch("/api" + path, { ...init, headers });
+    const r = await fetch(API_BASE + path, { ...init, headers });
     if (!r.ok) {
       const body = (await r.json().catch(() => ({}))) as {
         error?: { message?: string };
@@ -32,13 +36,13 @@ export class LocalOpsClient {
       ? this.request("/health")
       : {
           status: "ok",
-          mode: "browser-demo",
+          mode: "document-mode",
           retrieval: "keyword",
           voice: { stt: false, tts: false },
         };
   }
   async snapshot(): Promise<Snapshot> {
-    if (!this.local) return demo.snapshot();
+    if (!this.local) return browserWorkspace.snapshot();
     const [documents, datasets, approvals, tasks, reports, activity] =
       await Promise.all([
         this.request<Snapshot["documents"]>("/documents"),
@@ -51,7 +55,7 @@ export class LocalOpsClient {
     return { documents, datasets, approvals, tasks, reports, activity };
   }
   async history(conversation: string): Promise<Message[]> {
-    if (!this.local) return demo.messages();
+    if (!this.local) return browserWorkspace.messages();
     try {
       return await this.request(
         "/conversations/" + encodeURIComponent(conversation),
@@ -69,9 +73,14 @@ export class LocalOpsClient {
   ): Promise<Answer> {
     if (!this.local) {
       if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-      return demo.chat(message, datasetId);
+      // Yield to the browser so the pending state paints before local processing.
+      await new Promise<void>(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+      if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+      const answer = browserWorkspace.chat(message, datasetId);
+      if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+      return answer;
     }
-    const response = await fetch("/api/chat/stream", {
+    const response = await fetch(API_BASE + "/chat/stream", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -118,8 +127,8 @@ export class LocalOpsClient {
     if (!answer) throw new Error("Response interrupted. Retry your message.");
     return answer;
   }
-  async upload(file: File, kind: "document" | "dataset") {
-    if (!this.local) return demo.upload(file, kind);
+  async upload(file: File, kind: "document" | "dataset", onProgress?: (text:string)=>void) {
+    if (!this.local) return browserWorkspace.upload(file, kind, onProgress);
     const body = new FormData();
     body.append("file", file);
     return (
@@ -130,16 +139,16 @@ export class LocalOpsClient {
     ).id;
   }
   async document(id: string): Promise<Source> {
-    return this.local ? this.request("/documents/" + id) : demo.document(id);
+    return this.local ? this.request("/documents/" + id) : browserWorkspace.document(id);
   }
   async dataset(id: string): Promise<Dataset> {
     return this.local
       ? this.request("/analytics/datasets/" + id)
-      : demo.snapshot().datasets.find((d) => d.id === id)!;
+      : browserWorkspace.snapshot().datasets.find((d) => d.id === id)!;
   }
   async remove(id: string, kind: "document" | "dataset") {
     if (!this.local) {
-      demo.remove(id, kind);
+      browserWorkspace.remove(id, kind);
       return;
     }
     await this.request(
@@ -157,7 +166,7 @@ export class LocalOpsClient {
           method: "POST",
           body: JSON.stringify({ dataset_id: id, query }),
         })
-      : demo.query(id, query);
+      : browserWorkspace.query(id, query);
   }
   async decide(id: string, approved: boolean) {
     if (this.local)
@@ -165,14 +174,14 @@ export class LocalOpsClient {
         method: "POST",
         body: JSON.stringify({ approved }),
       });
-    else demo.decide(id, approved);
+    else browserWorkspace.decide(id, approved);
   }
   async settings(): Promise<{
     workspace_name: string;
     mode: string;
     model?: string;
   }> {
-    return this.local ? this.request("/settings") : demo.settings();
+    return this.local ? this.request("/settings") : browserWorkspace.settings();
   }
   async setName(workspace_name: string) {
     if (this.local)
@@ -180,16 +189,16 @@ export class LocalOpsClient {
         method: "PUT",
         body: JSON.stringify({ workspace_name }),
       });
-    else demo.setName(workspace_name);
+    else browserWorkspace.setName(workspace_name);
   }
   async clearChat(id: string) {
     if (this.local)
       await this.request("/conversations/" + id, { method: "DELETE" });
-    else demo.clearChat();
+    else browserWorkspace.clearChat();
   }
   async report(id: string) {
-    if (!this.local) return demo.report(id);
-    const r = await fetch("/api/reports/" + id, {
+    if (!this.local) return browserWorkspace.report(id);
+    const r = await fetch(API_BASE + "/reports/" + id, {
       headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
     });
     if (!r.ok) throw new Error("Report download failed");
@@ -204,7 +213,7 @@ export class LocalOpsClient {
     });
   }
   async synthesize(text: string) {
-    const r = await fetch("/api/voice/synthesize", {
+    const r = await fetch(API_BASE + "/voice/synthesize", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

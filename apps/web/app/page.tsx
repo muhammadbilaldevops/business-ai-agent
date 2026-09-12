@@ -23,6 +23,8 @@ import {
   Check,
   X,
   ExternalLink,
+  Sparkles,
+  Copy,
 } from "lucide-react";
 import {
   Sidebar,
@@ -72,7 +74,8 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { LocalOpsClient } from "@/lib/api";
-import { demo } from "@/lib/demo";
+import { suggestQuestions } from "@/lib/document-answers";
+import { browserWorkspace } from "@/lib/browser-workspace";
 import type {
   Snapshot,
   Message,
@@ -81,24 +84,18 @@ import type {
   Health,
 } from "@/lib/localops-types";
 import { AnalysisResult } from "@/components/analysis-result";
-import { VoicePanel } from "@/components/voice-panel";
+import { VoiceControls } from "@/components/voice-controls";
 const REPO =
   "https://github.com/muhammadbilaldevops/Ai-Agent-Industry-Level-Project";
 const views = [
-  { name: "Workspace", icon: LayoutDashboard },
+  { name: "Workspace", icon: MessageSquare },
   { name: "Knowledge base", icon: BookOpen },
   { name: "Analytics", icon: ChartNoAxesCombined },
   { name: "Approvals", icon: CheckCheck },
-  { name: "Voice assistant", icon: Mic },
   { name: "Activity", icon: Activity },
   { name: "Settings", icon: Settings },
 ];
-const suggestions = [
-  "What is our refund policy?",
-  "Analyze sales performance",
-  "Which products need restocking?",
-  "Create a follow-up task",
-];
+
 const empty: Snapshot = {
   documents: [],
   datasets: [],
@@ -163,6 +160,9 @@ export default function Home() {
     [busy, setBusy] = useState(false),
     [sending, setSending] = useState(false),
     [input, setInput] = useState(""),
+    [attachments, setAttachments] = useState<
+      { name: string; id: string; kind: string }[]
+    >([]),
     [streamText, setStreamText] = useState(""),
     [search, setSearch] = useState(""),
     [opened, setOpened] = useState<Source | null>(null),
@@ -203,16 +203,23 @@ export default function Home() {
   useEffect(() => {
     let live = true;
     async function init() {
-      let isLocal = false;
-      if (["localhost", "127.0.0.1", "::1"].includes(location.hostname)) {
+      let isLocal = Boolean(process.env.NEXT_PUBLIC_API_BASE_URL);
+      if (
+        process.env.NEXT_PUBLIC_API_BASE_URL ||
+        ["localhost", "127.0.0.1", "::1"].includes(location.hostname)
+      ) {
         try {
-          const r = await fetch("/api/health", {
-            signal: AbortSignal.timeout(2500),
-          });
+          const r = await fetch(
+            (process.env.NEXT_PUBLIC_API_BASE_URL || "/api") + "/health",
+            {
+              signal: AbortSignal.timeout(65000),
+            },
+          );
           const h = (await r.json()) as Health;
-          isLocal = r.ok && h.version === "0.2.0";
+          isLocal = isLocal || (r.ok && h.version === "0.2.0");
+          if (r.ok && live) setHealth(h);
         } catch {
-          /* A standalone static preview uses the browser demo. */
+          /* A standalone static preview uses the browser browserWorkspace. */
         }
       }
       if (!live) return;
@@ -272,7 +279,7 @@ export default function Home() {
   }
   async function send(question = input) {
     const q = question.trim();
-    if (!q || sending || !ready) return;
+    if (!q || sending || busy || !ready) return;
     setView("Workspace");
     setInput("");
     setError("");
@@ -286,7 +293,7 @@ export default function Home() {
       const answer = await client.chat(
         q,
         conversation.current,
-        undefined,
+        (/sales|revenue|inventory|dataset|rows|columns/i.test(q) ? attachments.find((a) => a.kind === "dataset")?.id : undefined),
         abort.current.signal,
         (t) => setStreamText((s) => s + t),
       );
@@ -294,40 +301,76 @@ export default function Home() {
         ...m,
         { role: "assistant", content: answer.answer, metadata: answer },
       ]);
+      setAttachments([]);
       await refresh();
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError")
         setInfo(
           "Response stopped. Any proposed action still requires approval.",
         );
-      else onError(e);
+      else { setInput(q); onError(e); }
     } finally {
       setSending(false);
       setStreamText("");
     }
   }
-  async function upload(file: File | undefined, kind: "document" | "dataset") {
-    if (!file) return;
+  async function uploadMany(
+    files: FileList | File[] | null,
+    forcedKind?: "document" | "dataset",
+  ) {
+    if (!files?.length || busy || sending) return;
+    const batch = Array.from(files);
+    if (batch.length > 10) {
+      setError("Choose up to 10 files at a time.");
+      return;
+    }
     await perform(async () => {
-      const id = await client.upload(file, kind);
-      await refresh();
-      if (kind === "dataset") {
-        setSelected(id);
-        const d = await client.dataset(id);
-        setAnalysis({
-          columns: d.columns,
-          rows: d.rows || [],
-          filename: d.filename,
-        });
+      const failures: string[] = [];
+      for (const file of batch) {
+        const kind =
+          forcedKind ||
+          (/\.(csv|xlsx)$/i.test(file.name) ? "dataset" : "document");
+        try {
+          setInfo("Reading " + file.name + "…");
+          const id = await client.upload(file, kind, setInfo);
+          if (kind === "dataset") setSelected(id);
+          setAttachments((a) => [
+            ...a.filter((x) => x.id !== id),
+            { name: file.name, id, kind },
+          ]);
+        } catch (e) {
+          failures.push(
+            file.name +
+              ": " +
+              (e instanceof Error ? e.message : "Upload failed"),
+          );
+        }
       }
-      setInfo(`${file.name} is ready.`);
+      await refresh();
+      if (failures.length) setError(failures.join("\n"));
+      setInfo(
+        batch.length - failures.length + " file(s) ready in your workspace.",
+      );
     });
+  }
+  async function newChat() {
+    if (sending) return;
+    conversation.current = crypto.randomUUID();
+    localStorage.setItem("localops-conversation", conversation.current);
+    if (!local) browserWorkspace.clearChat();
+    setMessages([]);
+    setInput("");
+    setAttachments([]);
+    setView("Workspace");
+    setError("");
+    setInfo("");
   }
   async function preview(id: string) {
     await perform(async () => {
       setOpened(await client.document(id));
     });
   }
+  const suggestions = useMemo(() => suggestQuestions(snapshot.documents, snapshot.datasets), [snapshot]);
   const pending = snapshot.approvals.filter(
     (a) => a.status === "pending",
   ).length;
@@ -359,7 +402,7 @@ export default function Home() {
       context.registerTool(
         {
           name: "navigate_localops_workspace",
-          title: "Open a LocalOps view",
+          title: "Open a Business AI Agent view",
           description:
             "Navigate to a workspace view without executing or approving actions.",
           inputSchema: {
@@ -396,12 +439,21 @@ export default function Home() {
       <Sidebar>
         <SidebarHeader>
           <Link className="brand" href="/">
-            <span className="brand-mark">L</span>
+            <span className="brand-mark">
+              <Sparkles size={23} />
+            </span>
             <span>
-              LocalOps <b>AI</b>
+              Business <b>AI Agent</b>
             </span>
           </Link>
-          <div className="workspace-label">{name}</div>
+          <Button
+            className="new-chat"
+            variant="ghost"
+            disabled={sending}
+            onClick={newChat}
+          >
+            <Plus size={18} /> New chat
+          </Button>
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
@@ -416,7 +468,7 @@ export default function Home() {
                   }}
                 >
                   <v.icon />
-                  <span>{v.name}</span>
+                  <span>{v.name === "Workspace" ? "Chat" : v.name}</span>
                   {v.name === "Approvals" && pending > 0 && (
                     <b className="nav-count">{pending}</b>
                   )}
@@ -426,22 +478,29 @@ export default function Home() {
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
-          <div className="privacy-card">
-            <ShieldCheck size={20} />
-            <strong>Your work stays yours</strong>
-            <p>
-              {local
-                ? "Files stay on your computer."
-                : "Demo files stay in this browser."}
-              <br />
-              {local ? "No cloud inference." : "Run the full agent locally."}
-            </p>
-          </div>
           <a className="author" href={REPO} target="_blank" rel="noreferrer">
             <span className="avatar">MB</span>
             <span>
               Muhammad Bilal<small>View project on GitHub ↗</small>
             </span>
+          </a>
+          <a
+            className="linkedin-link"
+            aria-label="Muhammad Bilal on LinkedIn (opens in new tab)"
+            href="https://www.linkedin.com/in/muhammadbilaldevops/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              width="19"
+              height="19"
+              fill="currentColor"
+            >
+              <path d="M20.45 2H3.55C2.69 2 2 2.68 2 3.53v16.94c0 .85.69 1.53 1.55 1.53h16.9c.86 0 1.55-.68 1.55-1.53V3.53c0-.85-.69-1.53-1.55-1.53zM7.93 18.75H4.98V9.2h2.95v9.55zM6.46 7.89a1.71 1.71 0 1 1 0-3.42 1.71 1.71 0 0 1 0 3.42zm12.29 10.86H15.8V14.1c0-1.11-.02-2.54-1.55-2.54-1.55 0-1.79 1.21-1.79 2.46v4.73H9.51V9.2h2.83v1.3h.04c.39-.74 1.36-1.52 2.8-1.52 2.99 0 3.57 1.97 3.57 4.53v5.24z" />
+            </svg>{" "}
+            LinkedIn
           </a>
         </SidebarFooter>
       </Sidebar>
@@ -450,7 +509,9 @@ export default function Home() {
           <div>
             <SidebarTrigger />
             <span>
-              Workspace / <strong>{view}</strong>
+              <strong>
+                {view === "Workspace" ? "Business AI Agent" : view}
+              </strong>
             </span>
           </div>
           <span className="mode-badge">
@@ -458,42 +519,56 @@ export default function Home() {
             {local
               ? health?.mode === "ollama"
                 ? "Local Ollama"
-                : "Local extractive · no LLM"
-              : "Browser demo · no LLM"}
+                : health?.mode === "gemini"
+                  ? "Gemini"
+                  : "Document excerpts"
+              : "Document mode"}
           </span>
         </header>
-        <main id="workspace-main" className="workspace">
-          <div className="page-heading">
-            <div>
-              <p className="eyebrow">YOUR OPERATIONS, CONNECTED</p>
-              <h1>{view === "Workspace" ? "Let’s get to work." : view}</h1>
-              <p>
-                {view === "Workspace"
-                  ? "Find answers. Understand your data. Move work forward."
-                  : view === "Knowledge base"
-                    ? "Give your assistant the context behind your business."
-                    : view === "Analytics"
-                      ? "Turn business files into clear, reproducible results."
-                      : view === "Approvals"
-                        ? "Review exactly what will change before it happens."
-                        : view === "Settings"
-                          ? "Make this workspace your own."
-                          : "Your workspace, with a visible trail."}
-              </p>
+        <main
+          id="workspace-main"
+          className={
+            "workspace " + (view === "Workspace" ? "chat-workspace" : "")
+          }
+        >
+          {view !== "Workspace" && (
+            <div className="page-heading">
+              <div>
+                <p className="eyebrow">YOUR OPERATIONS, CONNECTED</p>
+                <h1>{view === "Workspace" ? "Let’s get to work." : view}</h1>
+                <p>
+                  {view === "Workspace"
+                    ? "Find answers. Understand your data. Move work forward."
+                    : view === "Knowledge base"
+                      ? "Give your assistant the context behind your business."
+                      : view === "Analytics"
+                        ? "Turn business files into clear, reproducible results."
+                        : view === "Approvals"
+                          ? "Review exactly what will change before it happens."
+                          : view === "Settings"
+                            ? "Make this workspace your own."
+                            : "Your workspace, with a visible trail."}
+                </p>
+              </div>
+              {view === "Workspace" && (
+                <Button
+                  variant="outline"
+                  onClick={() => setView("Knowledge base")}
+                >
+                  <Plus />
+                  Add your documents
+                </Button>
+              )}
             </div>
-            {view === "Workspace" && (
-              <Button
-                variant="outline"
-                onClick={() => setView("Knowledge base")}
-              >
-                <Plus />
-                Add your documents
-              </Button>
-            )}
-          </div>
+          )}
           {error && (
             <div role="alert" className="error-banner">
               <span>{error}</span>
+              {local && !token && (
+                <Button variant="ghost" onClick={() => setView("Settings")}>
+                  Open Settings
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 aria-label="Dismiss error"
@@ -511,88 +586,14 @@ export default function Home() {
           {!ready && <p role="status">Opening your workspace…</p>}
           {view === "Workspace" && (
             <>
-              <div className="metrics-grid">
-                {[
-                  [
-                    "Knowledge sources",
-                    snapshot.documents.length,
-                    local
-                      ? "Your business documents"
-                      : "Sample & uploaded documents",
-                  ],
-                  [
-                    "Business datasets",
-                    snapshot.datasets.length,
-                    "Ready to explore",
-                  ],
-                  ["Pending approvals", pending, "You stay in control"],
-                ].map(([label, value, sub]) => (
-                  <div className="metric" key={String(label)}>
-                    <span>{label}</span>
-                    <strong>{value}</strong>
-                    <small>{sub}</small>
-                  </div>
-                ))}
-              </div>
               <div className="work-grid">
                 <section
                   className="chat-panel"
                   aria-label="Operations assistant"
                 >
-                  <div className="panel-heading">
-                    <span>
-                      <MessageSquare size={19} /> Operations assistant
-                    </span>
-                    <div className="button-row">
-                      <span className="tag">Evidence first</span>
-                      {messages.length > 0 && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label="Clear conversation"
-                          disabled={sending}
-                          onClick={() =>
-                            setConfirm({
-                              label: "Clear this conversation?",
-                              action: async () => {
-                                await client.clearChat(conversation.current);
-                                conversation.current = crypto.randomUUID();
-                                localStorage.setItem(
-                                  "localops-conversation",
-                                  conversation.current,
-                                );
-                                setMessages([]);
-                              },
-                            })
-                          }
-                        >
-                          <Trash2 size={16} />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
                   {messages.length === 0 ? (
                     <div className="welcome">
-                      <div className="assistant-icon">
-                        <Cpu size={24} />
-                      </div>
-                      <h2>What can I help you work on?</h2>
-                      <p>
-                        Ask about a policy, explore a dataset, or prepare a task
-                        for approval.
-                      </p>
-                      <div className="suggestions">
-                        {suggestions.map((q) => (
-                          <button
-                            disabled={!ready || sending}
-                            key={q}
-                            onClick={() => send(q)}
-                          >
-                            {q}
-                            <ArrowUp size={15} />
-                          </button>
-                        ))}
-                      </div>
+                      <div className="welcome-orbit" aria-hidden="true"><Sparkles size={28} /></div><h1>Ready when <span>you are</span></h1><p className="welcome-hint">Ideas, answers, and a little less busywork.</p>
                     </div>
                   ) : (
                     <div className="message-list" aria-live="polite">
@@ -604,12 +605,28 @@ export default function Home() {
                             ) : (
                               <span className="user-dot">Y</span>
                             )}
-                            {m.role === "assistant" ? "LocalOps" : "You"}
+                            {m.role === "assistant"
+                              ? "Business AI Agent"
+                              : "You"}
                             {m.metadata?.mode && (
-                              <small>{m.metadata.mode}</small>
+                              <small>{m.metadata.mode === "browser-demo" ? "document-mode" : m.metadata.mode}</small>
                             )}
                           </div>
                           <Text text={m.content} />
+                          {m.role === "assistant" && (
+                            <button
+                              className="copy-answer"
+                              aria-label="Copy answer"
+                              onClick={() =>
+                                navigator.clipboard
+                                  .writeText(m.content)
+                                  .then(() => setInfo("Answer copied."))
+                                  .catch(onError)
+                              }
+                            >
+                              <Copy size={16} />
+                            </button>
+                          )}
                           {m.metadata?.analytics && (
                             <AnalysisResult result={m.metadata.analytics} />
                           )}{" "}
@@ -650,9 +667,7 @@ export default function Home() {
                       ))}
                       {sending && (
                         <article className="message assistant">
-                          <div role="status">
-                            {streamText || "Working on your request…"}
-                          </div>
+                          <div role="status">{streamText || "Thinking…"}</div>
                         </article>
                       )}
                       <div ref={end} />
@@ -665,12 +680,33 @@ export default function Home() {
                       void send();
                     }}
                   >
+                    {attachments.length > 0 && (
+                      <div className="attachment-chips">
+                        {attachments.map((f) => (
+                          <span key={f.id}>
+                            <FileText size={15} />
+                            {f.name}
+                            <button
+                              type="button"
+                              aria-label={"Dismiss upload status for " + f.name}
+                              onClick={() =>
+                                setAttachments((a) =>
+                                  a.filter((x) => x.id !== f.id),
+                                )
+                              }
+                            >
+                              <X size={14} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <textarea
                       aria-label="Message"
                       maxLength={4000}
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
-                      placeholder="Ask a question about your business…"
+                      placeholder="Ask Business AI Agent"
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
@@ -678,13 +714,41 @@ export default function Home() {
                         }
                       }}
                     />
-                    <div>
-                      <span>
-                        <ShieldCheck size={14} />
-                        {local
-                          ? "Processed on your computer"
-                          : "Device-local demo · deterministic answers"}
+                    <div className="composer-toolbar">
+                      <label className="attach-control" title="Add files">
+                        <Plus size={23} />
+                        <span className="sr-only">Add files</span>
+                        <input
+                          aria-label="Add files"
+                          type="file"
+                          multiple
+                          disabled={busy || sending}
+                          accept=".pdf,.docx,.txt,.md,.csv,.json,.xlsx,.png,.jpg,.jpeg"
+                          onChange={(e) => {
+                            void uploadMany(e.target.files);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                      <span className="composer-status" role="status">
+                        {busy
+                          ? "Uploading…"
+                          : local
+                            ? "Workspace connected"
+                            : "Document mode"}
                       </span>
+                      <VoiceControls
+                        onTranscript={(text) =>
+                          setInput((s) => (s ? s + " " + text : text))
+                        }
+                        lastAnswer={
+                          [...messages]
+                            .reverse()
+                            .find((m) => m.role === "assistant")?.content || ""
+                        }
+                        onError={onError}
+                        disabled={sending || busy}
+                      />
                       {sending ? (
                         <Button
                           type="button"
@@ -697,13 +761,32 @@ export default function Home() {
                         <Button
                           type="submit"
                           aria-label="Send message"
-                          disabled={!input.trim() || !ready}
+                          disabled={!input.trim() || !ready || busy}
                         >
                           <ArrowUp />
                         </Button>
                       )}
                     </div>
                   </form>
+                  {suggestions.length > 0 && (
+                    <div className="quick-prompts" aria-label="Questions from your files">
+                      {suggestions.slice(0, 3).map((q) => (
+                        <button
+                          key={q}
+                          disabled={!ready || busy || sending}
+                          onClick={() => void send(q)}
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {messages.length === 0 && <details className="usage-guide"><summary>How to use Business AI Agent</summary><ol><li><strong>Add your files.</strong> Use the + button to choose up to 10 files at once. Wait for the upload to finish.</li><li><strong>Ask your question.</strong> Type in the message box or use the microphone. Review your words, then press Send.</li><li><strong>Explore the answer.</strong> Open cited sources, copy the response, or use the speaker button to listen.</li><li><strong>Stay in control.</strong> Review proposed tasks in Approvals. Use New chat to start a fresh conversation.</li></ol><p>{local ? "Connected workspaces support PDF, Word, text, JSON, CSV, and Excel files." : "Upload PDF, Word, text, JSON, CSV, Excel, or an image. Scanned pages are read with English OCR. Files stay in this browser in Document mode."}</p><p>Voice input uses your browser’s speech service and may send audio to its provider. Allow microphone access when prompted.</p></details>}
+                  <p className="chat-disclaimer">
+                    {local
+                      ? "Check important answers against their sources."
+                      : "Answers are grounded in your files. Always check the linked sources."}
+                  </p>
                   {error && messages.some((m) => m.role === "user") && (
                     <Button
                       variant="ghost"
@@ -714,44 +797,6 @@ export default function Home() {
                     </Button>
                   )}
                 </section>
-                <aside className="context-panel">
-                  <p className="eyebrow">WORKSPACE CONTEXT</p>
-                  <h2>
-                    A little context.
-                    <br />
-                    Better answers.
-                  </h2>
-                  <p>Your documents give the agent the evidence it needs.</p>
-                  <div className="source-list">
-                    {snapshot.documents.slice(0, 4).map((d) => (
-                      <button key={d.id} onClick={() => preview(d.id)}>
-                        <FileText size={20} />
-                        <span>
-                          {d.filename}
-                          <small>
-                            {local ? "Local document" : "Browser document"}
-                          </small>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    className="text-link"
-                    onClick={() => setView("Knowledge base")}
-                  >
-                    Explore knowledge base →
-                  </button>
-                  <div className="how-it-works">
-                    <h3>Every action has a trail</h3>
-                    <p>
-                      See the sources behind answers and review tasks before
-                      anything changes.
-                    </p>
-                    <span>
-                      <ShieldCheck size={16} /> Human approval built in
-                    </span>
-                  </div>
-                </aside>
               </div>
             </>
           )}
@@ -763,21 +808,18 @@ export default function Home() {
                 <p>
                   {local
                     ? "PDF, DOCX, TXT, Markdown, CSV, JSON, XLSX · up to 10 MB"
-                    : "TXT, Markdown, JSON · up to 200 KB per file. PDF and Office support is available locally."}
+                    : "PDF, Word, text, JSON, Excel, CSV, and images · up to 20 MB per file."}
                 </p>
                 <label className="upload-button">
-                  Choose document
+                  Choose documents
                   <input
                     aria-label="Upload document"
                     type="file"
+                    multiple
                     disabled={busy}
-                    accept={
-                      local
-                        ? ".pdf,.docx,.txt,.md,.csv,.json,.xlsx"
-                        : ".txt,.md,.json"
-                    }
+                    accept=".pdf,.docx,.txt,.md,.csv,.json,.xlsx,.png,.jpg,.jpeg"
                     onChange={(e) => {
-                      void upload(e.target.files?.[0], "document");
+                      void uploadMany(e.target.files, "document");
                       e.target.value = "";
                     }}
                   />
@@ -786,7 +828,7 @@ export default function Home() {
                   {busy
                     ? "Processing your file…"
                     : local
-                      ? "Saved and indexed on this computer."
+                      ? "Saved and indexed in this workspace."
                       : "Saved only in this browser. Clearing browser data removes your uploads."}
                 </small>
               </div>
@@ -898,10 +940,11 @@ export default function Home() {
                   <input
                     aria-label="Upload dataset"
                     type="file"
-                    accept={local ? ".csv,.xlsx" : ".csv"}
+                    multiple
+                    accept=".csv,.xlsx"
                     disabled={busy}
                     onChange={(e) => {
-                      void upload(e.target.files?.[0], "dataset");
+                      void uploadMany(e.target.files, "dataset");
                       e.target.value = "";
                     }}
                   />
@@ -993,7 +1036,7 @@ export default function Home() {
                 </div>
                 {!local && (
                   <p className="muted small">
-                    The demo supports the three example queries. The local app
+                    Document mode supports the three example queries. The local app
                     supports a broader, validated SQL subset.
                   </p>
                 )}
@@ -1145,17 +1188,6 @@ export default function Home() {
               </div>
             </>
           )}
-          {view === "Voice assistant" && (
-            <VoicePanel
-              client={client}
-              onSend={send}
-              lastAnswer={
-                [...messages].reverse().find((m) => m.role === "assistant")
-                  ?.content || ""
-              }
-              onError={onError}
-            />
-          )}
           {view === "Activity" && (
             <section className="content-card">
               <div className="section-toolbar">
@@ -1236,21 +1268,21 @@ export default function Home() {
                   <div>
                     <dt>Language model</dt>
                     <dd>
-                      {health?.mode === "ollama"
-                        ? "Configured locally"
+                      {["ollama", "gemini"].includes(health?.mode || "")
+                        ? "Connected"
                         : "Not used in this mode"}
                     </dd>
                   </div>
                   <div>
                     <dt>Document storage</dt>
-                    <dd>{local ? "Local SQLite" : "This browser only"}</dd>
+                    <dd>
+                      {local ? "Connected workspace" : "This browser only"}
+                    </dd>
                   </div>
                 </dl>
                 {local && (
                   <>
-                    <label htmlFor="api-token">
-                      Local API token (if configured)
-                    </label>
+                    <label htmlFor="api-token">Workspace access token</label>
                     <Input
                       id="api-token"
                       type="password"
@@ -1268,41 +1300,40 @@ export default function Home() {
                           }>("/health/model");
                           setInfo(
                             h.available
-                              ? "Configured local model is available."
-                              : "Start Ollama and download the configured model.",
+                              ? "Language model is configured."
+                              : "Add a model API key to the backend settings.",
                           );
                         })
                       }
                     >
-                      Check local model
+                      Check model
                     </Button>
                   </>
                 )}
                 {!local && (
                   <>
-                    <h2>Demo data</h2>
+                    <h2>Browser data</h2>
                     <p className="muted">
                       Files and conversations are stored on this device.
-                      Resetting removes your uploads and restores the synthetic
-                      sample workspace.
+                      Resetting removes your uploads and clears this workspace.
                     </p>
                     <Button
                       variant="outline"
                       onClick={() =>
                         setConfirm({
-                          label: "Reset all browser demo data?",
+                          label: "Reset all browser data?",
                           action: async () => {
-                            demo.reset();
+                            browserWorkspace.reset();
                             await refresh();
                             setMessages([]);
-                            setName(demo.settings().workspace_name);
-                            setInfo("Demo workspace reset.");
+                            setName(browserWorkspace.settings().workspace_name);
+                            setInfo("Workspace reset.");
                           },
                         })
                       }
                     >
                       <Trash2 />
-                      Reset demo workspace
+                      Reset workspace
                     </Button>
                   </>
                 )}
@@ -1337,7 +1368,7 @@ export default function Home() {
                   Read the complete setup guide <ExternalLink size={14} />
                 </a>
                 <div className="notice">
-                  The public demo has no Python server or local models. The
+                  Document mode works in your browser without a connected model. The
                   repository includes the full local runtime and its test
                   suites.
                 </div>
@@ -1353,7 +1384,25 @@ export default function Home() {
             </div>
           )}
           <footer className="workspace-footer">
-            <span>LocalOps AI · Built by Muhammad Bilal</span>
+            <span className="footer-author">
+              Built by Muhammad Bilal{" "}
+              <a
+                aria-label="Muhammad Bilal LinkedIn"
+                href="https://www.linkedin.com/in/muhammadbilaldevops/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  width="19"
+                  height="19"
+                  fill="currentColor"
+                >
+                  <path d="M20.45 2H3.55C2.69 2 2 2.68 2 3.53v16.94c0 .85.69 1.53 1.55 1.53h16.9c.86 0 1.55-.68 1.55-1.53V3.53c0-.85-.69-1.53-1.55-1.53zM7.93 18.75H4.98V9.2h2.95v9.55zM6.46 7.89a1.71 1.71 0 1 1 0-3.42 1.71 1.71 0 0 1 0 3.42zm12.29 10.86H15.8V14.1c0-1.11-.02-2.54-1.55-2.54-1.55 0-1.79 1.21-1.79 2.46v4.73H9.51V9.2h2.83v1.3h.04c.39-.74 1.36-1.52 2.8-1.52 2.99 0 3.57 1.97 3.57 4.53v5.24z" />
+                </svg>
+              </a>
+            </span>
             <a
               href={`${REPO}/blob/main/docs/architecture.md`}
               target="_blank"

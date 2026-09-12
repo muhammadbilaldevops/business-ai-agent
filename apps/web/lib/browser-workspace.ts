@@ -1,72 +1,34 @@
-/** Browser-only deterministic demo. Never calls a language model or uploads files. */
+/** Browser-only document workspace. Never calls a language model or uploads files. */
+import { readDocument, readSpreadsheet } from './document-readers';
+import { answerDocuments } from './document-answers';
 import type { Snapshot, Answer, Message, Analysis } from "./localops-types";
-const KEY = "localops-demo-v2";
+const KEY = "business-ai-workspace-v3";
 type State = Snapshot & { messages: Message[]; workspace_name: string };
 const now = () => new Date().toISOString();
 const initial = (): State => ({
-  documents: [
-    {
-      id: "refund",
-      filename: "Refund policy.md",
-      content:
-        "# Refund policy\nCustomers can request a refund within 30 days of purchase. A receipt or order number is required. Items must be unused and in their original packaging. Approved refunds return to the original payment method within 5–7 business days.",
-      status: "ready",
-    },
-    {
-      id: "onboarding",
-      filename: "Employee onboarding.md",
-      content:
-        "# Employee onboarding\nDay 1: orientation, security training, and equipment setup. Week 1: meet your team and complete product training. Your manager schedules a check-in at the end of the first month.",
-      status: "ready",
-    },
-    {
-      id: "delivery",
-      filename: "Delivery guidelines.md",
-      content:
-        "# Delivery guidelines\nStandard delivery takes 3–5 business days. Escalate a delivery delay after 7 business days. Support should confirm the shipping address, review tracking, and create a follow-up task for the logistics team.",
-      status: "ready",
-    },
-  ],
-  datasets: [
-    {
-      id: "sales",
-      filename: "sales.csv",
-      columns: ["month", "revenue", "orders"],
-      row_count: 6,
-      rows: [
-        { month: "2026-03", revenue: 18200, orders: 140 },
-        { month: "2026-04", revenue: 21500, orders: 164 },
-        { month: "2026-05", revenue: 20900, orders: 159 },
-        { month: "2026-06", revenue: 24800, orders: 182 },
-        { month: "2026-07", revenue: 27200, orders: 203 },
-        { month: "2026-08", revenue: 23900, orders: 181 },
-      ],
-    },
-    {
-      id: "inventory",
-      filename: "inventory.csv",
-      columns: ["product", "stock", "reorder_level"],
-      row_count: 4,
-      rows: [
-        { product: "Wireless keyboard", stock: 12, reorder_level: 20 },
-        { product: "USB-C hub", stock: 42, reorder_level: 15 },
-        { product: "Laptop stand", stock: 6, reorder_level: 10 },
-        { product: "Desk mat", stock: 35, reorder_level: 10 },
-      ],
-    },
-  ],
+  documents: [],
+  datasets: [],
   approvals: [],
   tasks: [],
   reports: [],
   activity: [],
   messages: [],
-  workspace_name: "Bilal’s demo workspace",
+  workspace_name: "Bilal’s workspace",
 });
 let memory: State | undefined;
 function state() {
   if (!memory) {
     try {
-      memory = JSON.parse(localStorage.getItem(KEY) || "null") || initial();
+      const saved = localStorage.getItem(KEY);
+      memory = saved ? JSON.parse(saved) : initial();
+      if (!saved) {
+        const legacy = JSON.parse(localStorage.getItem("localops-demo-v2") || "null");
+        if(legacy) {
+          memory!.documents = (legacy.documents || []).filter((d: {id:string})=>!["refund","onboarding","delivery"].includes(d.id));
+          memory!.datasets = (legacy.datasets || []).filter((d: {id:string})=>!["sales","inventory"].includes(d.id));
+          memory!.approvals = legacy.approvals || [];memory!.tasks=legacy.tasks||[];memory!.reports=legacy.reports||[];
+        }
+      }
     } catch {
       memory = initial();
     }
@@ -74,9 +36,9 @@ function state() {
   return memory!;
 }
 function save(s: State) {
-  if (JSON.stringify(s).length > 2_000_000)
+  if (JSON.stringify(s).length > 4_000_000)
     throw new Error(
-      "This browser workspace is full. Remove documents or clear demo data in Settings.",
+      "This browser workspace is full. Remove documents or clear browser data in Settings.",
     );
   localStorage.setItem(KEY, JSON.stringify(s));
   memory = s;
@@ -96,7 +58,7 @@ function audit(s: State, event: string, id: string) {
   });
   s.activity = s.activity.slice(0, 100);
 }
-export const demo = {
+export const browserWorkspace = {
   snapshot(): Snapshot {
     return structuredClone(state());
   },
@@ -104,7 +66,7 @@ export const demo = {
     return structuredClone(state().messages);
   },
   settings() {
-    return { workspace_name: state().workspace_name, mode: "browser-demo" };
+    return { workspace_name: state().workspace_name, mode: "document-mode" };
   },
   setName(name: string) {
     change((s) => {
@@ -125,50 +87,15 @@ export const demo = {
     if (!d) throw new Error("Document not found");
     return structuredClone(d);
   },
-  async upload(file: File, kind: "document" | "dataset") {
-    if (file.size > 200_000 || file.size === 0)
-      throw new Error(
-        "Demo files must contain text and be smaller than 200 KB. Use the local app for larger files.",
-      );
-    const text = await file.text();
-    const id = crypto.randomUUID();
-    if (kind === "document") {
-      if (!/\.(txt|md|json)$/i.test(file.name))
-        throw new Error(
-          "The browser demo accepts TXT, Markdown, or JSON. PDF and Office files work in the local application.",
-        );
-      if (file.name.toLowerCase().endsWith(".json")) JSON.parse(text);
-      if (text.includes("\u0000"))
-        throw new Error("Please upload a text file.");
-      change((s) => {
-        if (s.documents.length >= 30)
-          throw new Error("Demo limit: 30 documents.");
-        s.documents.push({
-          id,
-          filename: file.name,
-          content: text,
-          status: "ready",
-        });
-        audit(s, "document_uploaded", id);
-      });
+  async upload(file: File, kind: "document" | "dataset", onProgress?: (text:string)=>void) {
+    const id=crypto.randomUUID();
+    if(file.size===0 || file.size>20*1024*1024)throw new Error("Choose a non-empty file up to 20 MB.");
+    if(kind === "document") {
+      const content=await readDocument(file,onProgress);
+      change(s=>{if(s.documents.length>=30)throw new Error("Workspace limit: 30 documents.");s.documents.push({id,filename:file.name,content,status:"ready"});audit(s,"document_uploaded",id);});
     } else {
-      if (!/\.csv$/i.test(file.name))
-        throw new Error(
-          "The browser demo accepts CSV. XLSX works in the local application.",
-        );
-      const { columns, rows } = parseCSV(text);
-      change((s) => {
-        if (s.datasets.length >= 10)
-          throw new Error("Demo limit: 10 datasets.");
-        s.datasets.push({
-          id,
-          filename: file.name,
-          columns,
-          rows,
-          row_count: rows.length,
-        });
-        audit(s, "dataset_uploaded", id);
-      });
+      const data=/\.xlsx$/i.test(file.name)?await readSpreadsheet(file):parseCSV(await file.text());
+      change(s=>{if(s.datasets.length>=10)throw new Error("Workspace limit: 10 datasets.");s.datasets.push({id,filename:file.name,...data,row_count:data.rows.length});audit(s,"dataset_uploaded",id);});
     }
     return id;
   },
@@ -227,7 +154,7 @@ export const demo = {
         query: sql,
       };
     throw new Error(
-      "This demo supports the three example queries shown below. Run the local app for validated DuckDB SQL.",
+      "Document mode supports the three example queries shown below. Run the local app for validated DuckDB SQL.",
     );
   },
   chat(query: string, datasetId?: string): Answer {
@@ -237,12 +164,12 @@ export const demo = {
       citations: [],
       trajectory: ["supervisor"],
       conversation_id: "browser",
-      mode: "browser-demo",
+      mode: "document-mode",
     };
-    const analytical =
+    const analytical = state().datasets.length > 0 && (
       /\b(sales|inventory|restock|revenue|dataset|analy[sz]e|stock)\b/.test(
         q,
-      ) || !!datasetId;
+      ) || !!datasetId);
     const action =
       /\b(create|prepare|generate|make|draft)\b.*\b(task|report|follow-up)\b/.test(
         q,
@@ -296,59 +223,10 @@ export const demo = {
         "Review the proposed action in Approvals. Nothing has been executed yet.";
       result.trajectory.push("action_agent");
     } else if (!analytical) {
-      const ignored = new Set([
-        "what",
-        "is",
-        "our",
-        "the",
-        "a",
-        "an",
-        "for",
-        "to",
-        "of",
-        "and",
-        "are",
-        "in",
-        "how",
-        "does",
-        "can",
-        "you",
-        "please",
-        "me",
-        "it",
-        "about",
-        "with",
-      ]);
-      const terms = Array.from(
-        new Set(q.match(/[\p{L}\p{N}]+/gu) || []),
-      ).filter((w) => !ignored.has(w) && w.length > 1);
-      const evidence = state()
-        .documents.flatMap((d) => {
-          const matches = [...(d.content || "").matchAll(/[\s\S]{1,900}/g)]
-            .map((m) => ({
-              text: m[0],
-              score: terms.filter((t) => m[0].toLowerCase().includes(t)).length,
-            }))
-            .sort((a, b) => b.score - a.score);
-          return matches[0]?.score
-            ? [
-                {
-                  document_id: d.id,
-                  filename: d.filename,
-                  excerpt: matches[0].text,
-                  score: matches[0].score,
-                },
-              ]
-            : [];
-        })
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 3);
-      result.citations = evidence;
+      const grounded = answerDocuments(query, state().documents);
+      result.answer = grounded.answer;
+      result.citations = grounded.citations;
       result.trajectory.push("knowledge_agent");
-      result.answer = evidence.length
-        ? "Relevant source excerpts (browser demo; no language model):\n\n" +
-          evidence.map((e, i) => `[${i + 1}] ${e.excerpt}`).join("\n\n")
-        : "I do not have sufficient evidence to answer that. Upload a relevant document or try one of the suggested questions.";
     }
     change((s) => {
       s.messages.push(

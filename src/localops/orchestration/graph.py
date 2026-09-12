@@ -15,6 +15,7 @@ from localops.agents.state import AgentState
 from localops.agents.supervisor import classify
 from localops.analytics import query_rows
 from localops.llm.ollama_client import SYSTEM, OllamaClient
+from localops.llm.gemini_client import GeminiClient
 
 
 class Agent:
@@ -25,7 +26,7 @@ class Agent:
             registry,
             settings,
         )
-        self.llm = OllamaClient(settings)
+        self.llm = GeminiClient(settings) if settings.mode == "gemini" else OllamaClient(settings)
         self.lock = threading.RLock()
         self.events = threading.local()
         self.connection = sqlite3.connect(
@@ -37,14 +38,7 @@ class Agent:
         builder.add_node("analyst_agent", self.analytics)
         builder.add_node("action_agent", self.prepare)
         builder.add_node("human_approval", self.approval)
-        builder.add_node(
-            "general",
-            lambda s: self.step(
-                s,
-                "general",
-                final_answer="Hello. Ask about an uploaded document, analyze a dataset, or create a task for approval.",
-            ),
-        )
+        builder.add_node("general", self.general)
         builder.add_edge(START, "supervisor")
         builder.add_conditional_edges(
             "supervisor",
@@ -81,40 +75,43 @@ class Agent:
             s, "supervisor", intent=classify(s["user_query"], bool(s.get("dataset_id")))
         )
 
+    def model_answer(self, s, context):
+        history = self.store.rows(
+            "SELECT role,content FROM messages WHERE conversation_id=? ORDER BY id DESC LIMIT 7",
+            (s["conversation_id"],),
+        )
+        history = list(reversed(history))
+        if history and history[-1]["role"] == "user":
+            history = history[:-1]
+        messages = [{"role": "system", "content": SYSTEM}] + history
+        messages.append({"role": "user", "content": json.dumps({
+            "question": s["user_query"], "untrusted_evidence": context,
+        })})
+        pieces = []
+        for item in self.llm.stream(messages):
+            token = item.get("message", {}).get("content", "")
+            pieces.append(token)
+            if getattr(self.events, "emit", None):
+                self.events.emit(token)
+        answer = "".join(pieces)
+        if not answer.strip():
+            raise HTTPException(503, "The model returned an empty response")
+        return answer
+
+    def general(self, s):
+        answer = self.model_answer(s, "") if self.settings.mode == "gemini" else "Hello. Ask about an uploaded document, analyze a dataset, or create a task for approval."
+        return self.step(s, "general", final_answer=answer)
+
     def knowledge(self, s):
         citations = self.retriever.search(s["user_query"])
+        context = "\n\n".join(
+            f"[{i + 1}] {c['filename']}: {c['excerpt']}" for i, c in enumerate(citations)
+        )
         answer = "I do not have sufficient local evidence to answer that. Upload a relevant document or ask a more specific question."
-        if citations:
-            context = "\n\n".join(
-                f"[{i + 1}] {c['filename']}: {c['excerpt']}" for i, c in enumerate(citations)
-            )
-            if self.settings.mode == "ollama":
-                history = self.store.rows(
-                    "SELECT role,content FROM messages WHERE conversation_id=? ORDER BY id DESC LIMIT 6",
-                    (s["conversation_id"],),
-                )
-                messages = [{"role": "system", "content": SYSTEM}] + list(reversed(history))
-                messages.append(
-                    {
-                        "role": "user",
-                        "content": json.dumps(
-                            {"question": s["user_query"], "untrusted_evidence": context}
-                        ),
-                    }
-                )
-                pieces = []
-                for item in self.llm.stream(messages):
-                    token = item.get("message", {}).get("content", "")
-                    pieces.append(token)
-                    if getattr(self.events, "emit", None):
-                        self.events.emit(token)
-                answer = "".join(pieces)
-                if not answer.strip():
-                    raise HTTPException(503, "Local model returned an empty response")
-            else:
-                answer = (
-                    "Relevant source excerpts (extractive mode; no language model):\n\n" + context
-                )
+        if self.settings.mode == "gemini" or (citations and self.settings.mode == "ollama"):
+            answer = self.model_answer(s, context)
+        elif citations:
+            answer = "Relevant source excerpts (extractive mode; no language model):\n\n" + context
         return self.step(s, "knowledge_agent", citations=citations, final_answer=answer)
 
     def analytics(self, s):

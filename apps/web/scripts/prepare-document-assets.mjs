@@ -1,0 +1,13 @@
+import {createRequire} from 'node:module';
+import {cpSync,mkdirSync,readdirSync} from 'node:fs';
+import path from 'node:path';
+const require=createRequire(import.meta.url);const web=path.resolve(import.meta.dirname,'..');
+const target=path.join(web,'public/document-assets');mkdirSync(target,{recursive:true});
+const pdf=path.dirname(require.resolve('pdfjs-dist/package.json'));
+cpSync(path.join(pdf,'build/pdf.worker.min.mjs'),path.join(target,'pdf.worker.min.mjs'));
+for(const dir of ['cmaps','standard_fonts','wasm'])cpSync(path.join(pdf,dir),path.join(target,dir),{recursive:true});
+const tess=path.dirname(require.resolve('tesseract.js/package.json'));mkdirSync(path.join(target,'ocr/core'),{recursive:true});mkdirSync(path.join(target,'ocr/lang'),{recursive:true});
+cpSync(path.join(tess,'dist/worker.min.js'),path.join(target,'ocr/worker.min.js'));
+const fromTess=createRequire(path.join(tess,'package.json'));const core=path.dirname(fromTess.resolve('tesseract.js-core/package.json'));
+for(const name of readdirSync(core).filter(n=>/^tesseract-core.*\.wasm(?:\.js)?$/.test(n)))cpSync(path.join(core,name),path.join(target,'ocr/core',name));
+console.log('Document reader assets prepared.');
