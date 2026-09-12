@@ -9,4 +9,5 @@
     "dev": "npm --prefix apps/web run dev"
   },
   "packageManager": "pnpm@11.25.0"
+  ,"workspaces": ["apps/web", "apps/api"]
 }
