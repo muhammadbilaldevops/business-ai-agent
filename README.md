@@ -20,20 +20,26 @@ Built by **Muhammad Bilal**. Upload a résumé, policy, report, spreadsheet, or 
 
 ## 🧭 Architecture
 
-```mermaid
-flowchart LR
- B[🌐 Browser] --> V[⚡ Vercel Next.js]
- V --> M{Mode}
- M -->|No API URL| L[Browser workspace<br/>localStorage + OCR + source QA]
- M -->|API URL| A[🚀 Render FastAPI]
- A --> S[Supervisor]
- S --> R[RAG retrieval + citations]
- S --> N[Analytics]
- S --> T[Tools + approvals]
- S --> G{Model}
- G --> Gemini[Gemini API]
- G --> Ollama[Ollama]
- T --> DB[(SQLite / store)]
+```text
+🌐 Browser
+   │
+   ▼
+⚡ Vercel Next.js frontend
+   │
+   ├── No API URL ──► Browser workspace
+   │                  ├── localStorage
+   │                  ├── PDF/DOCX/XLSX readers
+   │                  ├── OCR and local Whisper voice
+   │                  └── source-grounded answers
+   │
+   └── API URL ─────► 🚀 Render FastAPI backend
+                          ├── authentication, CORS, validation
+                          ├── supervisor and workflow graph
+                          ├── RAG retrieval and citations
+                          ├── analytics and validated queries
+                          ├── tools and human approvals
+                          ├── Gemini API or local Ollama
+                          └── SQLite / configured persistence
 ```
 
 ## 🌈 Features
