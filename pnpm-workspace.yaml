@@ -1,3 +1,11 @@
 packages:
   - apps/web
   - apps/api
+allowBuilds:
+  esbuild: true
+  sharp: true
+  unrs-resolver: true
+  workerd: true
+  onnxruntime-node: false
+  protobufjs: false
+  tesseract.js: false
