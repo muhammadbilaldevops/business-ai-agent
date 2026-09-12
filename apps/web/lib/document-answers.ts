@@ -50,6 +50,7 @@ export function answerDocuments(question:string, documents:Source[], history:{ro
  const bestScore=Math.max(0,...all.map(c=>c.score));
  const priorCitations=history.flatMap(message=>message.metadata?.citations||[]);
  const priorPositions=priorCitations.map(c=>({document_id:c.document_id,index:c.chunk_index})).filter(c=>typeof c.index==='number');
+ if(continuing && !priorPositions.length)return {answer:'There is no earlier document answer to continue. Ask a specific question about one of your uploaded files first.',citations:[]};
  let selected;
  if(continuing && priorPositions.length){
   const next=priorPositions.map(previous=>all.find(c=>c.document_id===previous.document_id&&c.index===previous.index!+1)).filter(Boolean) as typeof all;

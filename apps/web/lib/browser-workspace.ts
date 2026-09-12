@@ -166,15 +166,17 @@ export const browserWorkspace = {
       conversation_id: "browser",
       mode: "document-mode",
     };
-    const analytical = state().datasets.length > 0 && (
-      /\b(sales|inventory|restock|revenue|dataset|analy[sz]e|stock)\b/.test(
-        q,
-      ) || !!datasetId);
+    const analyticsIntent = /\b(sales|inventory|restock|revenue|dataset|analy[sz]e|stock|rows|columns)\b/.test(q) || !!datasetId;
+    const analytical = state().datasets.length > 0 && analyticsIntent;
     const action =
       /\b(create|prepare|generate|make|draft)\b.*\b(task|report|follow-up)\b/.test(
         q,
       );
-    if (analytical) {
+    const workspaceIsEmpty = state().documents.length === 0 && state().datasets.length === 0;
+    if (workspaceIsEmpty) {
+      result.answer = "Upload a document, CSV, or Excel file first, then ask a question about it. I use only the files in your workspace to answer.";
+      result.trajectory.push("workspace_guard");
+    } else if (analytical) {
       const d =
         state().datasets.find((d) => d.id === datasetId) ||
         state().datasets.find((d) =>
@@ -195,8 +197,11 @@ export const browserWorkspace = {
         result.answer = `Computed ${result.analytics.rows.length} result rows from ${d.filename}. These are descriptive results; this data does not establish causes.`;
       }
       result.trajectory.push("analyst_agent");
+    } else if (analyticsIntent) {
+      result.answer = "Upload a CSV or Excel dataset first to ask analytics questions. You can add it with the + button, then ask about its rows, columns, sales, revenue, or inventory.";
+      result.trajectory.push("analyst_agent");
     }
-    if (action) {
+    if (!workspaceIsEmpty && action) {
       const id = crypto.randomUUID();
       const tool = q.includes("report") ? "create_report" : "create_task";
       const payload =
@@ -222,7 +227,7 @@ export const browserWorkspace = {
         (result.answer ? "\n\n" : "") +
         "Review the proposed action in Approvals. Nothing has been executed yet.";
       result.trajectory.push("action_agent");
-    } else if (!analytical) {
+    } else if (!workspaceIsEmpty && !analytical && !analyticsIntent) {
       const grounded = answerDocuments(query, state().documents, state().messages);
       result.answer = grounded.answer;
       result.citations = grounded.citations;
