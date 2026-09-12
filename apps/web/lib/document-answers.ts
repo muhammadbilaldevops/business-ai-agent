@@ -6,7 +6,8 @@ function chunks(text: string) {
  for(const line of lines){ if(part.length+line.length>650 && part){result.push(part);part='';} if(line.length>900){for(let i=0;i<line.length;i+=600)result.push(line.slice(i,i+750));}else part+=(part?'\n':'')+line; } if(part)result.push(part); return result;
 }
 const isContinuation = (question: string) => /^(?:continue|go on|keep going|more|tell me more|show more|next)(?:\s*[.!?])?$/i.test(question.trim());
-const isAcknowledgement = (question: string) => /^(?:nice|thanks|thank you|great|good|okay|ok|got it|cool|awesome)(?:\s*(?:thanks|thank you))?[.!?]*$/i.test(question.trim());
+const isAcknowledgement = (question: string) => /^(?:nice|thanks|thank you|great|good|okay|ok|got it|cool|awesome|wow|amazing|perfect|excellent|helpful|lovely)(?:\s*(?:thanks|thank you))?[.!?]*$/i.test(question.trim());
+const isGreeting = (question: string) => /^(?:hi|hello|hey|good morning|good afternoon|good evening|how are you)[.!?]*$/i.test(question.trim());
 function focusedExcerpt(text: string, keywords: string[]) {
  const lines=text.split(/\n+/).map(line=>line.trim()).filter(Boolean);
  const relevant=lines.filter(line=>keywords.some(word=>line.toLowerCase().includes(word)));
@@ -25,8 +26,9 @@ export function suggestQuestions(documents: Source[], datasets: Dataset[]) {
  const data=datasets[datasets.length-1];return data ? [`Analyze ${data.filename}`,`Show the first rows of ${data.filename}`,`What columns are in ${data.filename}?`] : [];
 }
 export function answerDocuments(question:string, documents:Source[], history:{role:string;content:string;metadata?:{citations?:Citation[]}}[]=[]):{answer:string;citations:Citation[]} {
- if(!documents.length)return {answer:'Add your files using the + button, then ask about their contents. I will show the sources behind each answer.',citations:[]};
- if(isAcknowledgement(question))return {answer:'You’re welcome. Ask another question about your uploaded files whenever you’re ready.',citations:[]};
+ if(!documents.length)return {answer:'📎 I’d be happy to help! Please add a document with the + button first, then ask me anything about it. I’ll keep my answers tied to your file.',citations:[]};
+ if(isAcknowledgement(question))return {answer:'😊 Glad that helped! Whenever you’re ready, ask me anything else about your uploaded files.',citations:[]};
+ if(isGreeting(question))return {answer:'👋 Hi! I’m here to help you explore your uploaded files. What would you like to know?',citations:[]};
  const continuing=isContinuation(question);
  const previousUser=[...history].reverse().find(message=>message.role==='user')?.content;
  const q=(continuing && previousUser ? previousUser : question).toLowerCase();
@@ -50,7 +52,7 @@ export function answerDocuments(question:string, documents:Source[], history:{ro
  const bestScore=Math.max(0,...all.map(c=>c.score));
  const priorCitations=history.flatMap(message=>message.metadata?.citations||[]);
  const priorPositions=priorCitations.map(c=>({document_id:c.document_id,index:c.chunk_index})).filter(c=>typeof c.index==='number');
- if(continuing && !priorPositions.length)return {answer:'There is no earlier document answer to continue. Ask a specific question about one of your uploaded files first.',citations:[]};
+ if(continuing && !priorPositions.length)return {answer:'🔎 I don’t have an earlier document answer to continue from yet. Ask me a specific question about one of your uploaded files and I’ll take it from there.',citations:[]};
  let selected;
  if(continuing && priorPositions.length){
   const next=priorPositions.map(previous=>all.find(c=>c.document_id===previous.document_id&&c.index===previous.index!+1)).filter(Boolean) as typeof all;
@@ -58,7 +60,7 @@ export function answerDocuments(question:string, documents:Source[], history:{ro
  } else {
   selected=isSummary?all.filter(c=>c.index<4).slice(0,4):all.filter(c=>c.score>0&&c.score>=bestScore*0.65).sort((a,b)=>b.score-a.score).slice(0,3);
  }
- if(!selected.length)return {answer:'I couldn’t find that information in the uploaded files. Try a more specific question, or add a document containing the answer. I won’t fill in missing facts.',citations:[]};
+ if(!selected.length)return {answer:'🔍 I couldn’t spot that in the uploaded files. Could you try phrasing the question a little differently, or add the file that contains it? I’ll stick to what your documents actually say.',citations:[]};
  const intro=continuing?'Here is the next relevant detail from the same document:':isSummary?'Here is a source-based overview of your document:':isSkills?'These passages list the relevant skills and technologies:':isExperience?'Here is the experience recorded in your document:':isProjects?'These are the projects and achievements I found:':'I found the information most relevant to your question:';
  return {answer:intro+'\n\n'+selected.map((c,i)=>`**${c.filename} [${i+1}]**\n\n${focusedExcerpt(c.excerpt,expanded)}`).join('\n\n'),citations:selected.map(c=>({...c,chunk_index:c.index}))};
 }

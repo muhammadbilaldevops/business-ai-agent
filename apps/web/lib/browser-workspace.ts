@@ -174,7 +174,7 @@ export const browserWorkspace = {
       );
     const workspaceIsEmpty = state().documents.length === 0 && state().datasets.length === 0;
     if (workspaceIsEmpty) {
-      result.answer = "Upload a document, CSV, or Excel file first, then ask a question about it. I use only the files in your workspace to answer.";
+      result.answer = "👋 I’m ready when you are! Please upload a document, CSV, or Excel file with the + button first. Then ask me anything about it, and I’ll give you a clear, source-based answer.";
       result.trajectory.push("workspace_guard");
     } else if (analytical) {
       const d =
@@ -198,7 +198,7 @@ export const browserWorkspace = {
       }
       result.trajectory.push("analyst_agent");
     } else if (analyticsIntent) {
-      result.answer = "Upload a CSV or Excel dataset first to ask analytics questions. You can add it with the + button, then ask about its rows, columns, sales, revenue, or inventory.";
+      result.answer = "📊 I can help with that! Please upload a CSV or Excel dataset with the + button first. Then you can ask about its rows, columns, sales, revenue, or inventory.";
       result.trajectory.push("analyst_agent");
     }
     if (!workspaceIsEmpty && action) {
