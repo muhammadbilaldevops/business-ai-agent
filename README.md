@@ -8,6 +8,32 @@ Built by **Muhammad Bilal**. Upload a résumé, policy, report, spreadsheet, or 
 
 🌐 [GitHub](https://github.com/muhammadbilaldevops/business-ai-agent) · 🔗 [LinkedIn](https://www.linkedin.com/in/muhammadbilaldevops/)
 
+## 🌟 Vision: why this project exists
+
+Business AI Agent solves a common operations problem: important knowledge is scattered across policies, reports, résumés, manuals, CSV files, and spreadsheets. Finding a policy answer means searching documents manually; spotting an inventory issue means opening a spreadsheet and calculating it; turning a finding into follow-up work can become unsafe when automation has no review step.
+
+This project brings those workflows into one **local-first, evidence-based business workspace**. A user can upload private files, ask a question in normal language or by voice, receive a source-grounded answer, safely analyze structured data, and prepare a task or report that remains pending until a human approves it. It is an AI agent because it routes a request to the right controlled capability—not because it has unrestricted autonomy.
+
+**The core promise:** private business knowledge becomes easier to use, business data becomes easier to inspect, and proposed automation stays visible and human-controlled.
+
+## 🧑‍🏫 How every main functionality works
+
+Start with the complete beginner-friendly guide: [docs/BEGINNER_FUNCTIONALITY_GUIDE.md](docs/BEGINNER_FUNCTIONALITY_GUIDE.md).
+
+It explains, step by step:
+
+1. Browser document mode versus the full local API mode.
+2. Chat messages, suggested questions, natural follow-ups, and error recovery.
+3. PDF/DOCX/text/CSV/XLSX upload, validation, extraction, chunking, and storage.
+4. RAG retrieval, BM25, optional vector search, reranking, citations, and evidence limits.
+5. LangGraph routing between knowledge, analytics, actions, and general conversation.
+6. Optional local-model prompting and Server-Sent Event streaming.
+7. Safe CSV/Excel analytics with validated read-only DuckDB queries.
+8. Approval-gated task/report creation, durable decisions, and audit records.
+9. Voice input/output, local persistence, security boundaries, and test layers.
+
+The guide intentionally labels implemented behavior, optional local components, and future work so beginners can learn from the actual project without confusing planned features with completed ones.
+
 ## 🎯 What it demonstrates
 
 - Production-style Next.js frontend + FastAPI backend monorepo.
