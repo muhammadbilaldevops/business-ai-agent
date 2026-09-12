@@ -1,135 +1,135 @@
-# LocalOps AI
+# ✨ Business AI Agent
 
-**A local business operations assistant with evidence-backed answers, data analysis, and human-approved actions.**
+> Evidence-first AI workspace for business documents, datasets, voice questions, analytics, and human-approved actions.
 
-Built by **Muhammad Bilal** as an inspectable AI engineering portfolio project. Upload your business documents, ask questions with citations, analyze CSV/Excel data, and review tasks or reports before they are created.
+[![Frontend](https://img.shields.io/badge/frontend-Next.js%2016%20%7C%20React%2019-111827?logo=next.js)](apps/web) [![Backend](https://img.shields.io/badge/backend-FastAPI%20%7C%20Python%203.12-0f766e?logo=fastapi)](apps/api) [![AI](https://img.shields.io/badge/AI-Gemini%20%7C%20Ollama-7c3aed)](src/localops/llm) [![Tests](https://img.shields.io/badge/tests-pytest%20%2B%20Playwright-16a34a)](tests)
 
-[Architecture](docs/architecture.md) · [Getting started](docs/getting-started.md) · [API guide](docs/api-reference.md) · [Testing](docs/testing-strategy.md) · [Specification coverage](docs/requirements-coverage.md)
+Built by **Muhammad Bilal**. Upload a résumé, policy, report, spreadsheet, or scanned PDF; ask a grounded question; inspect evidence; and send operational actions through human approval.
 
-## Start here
+🌐 [GitHub](https://github.com/muhammadbilaldevops/business-ai-agent) · 🔗 [LinkedIn](https://www.linkedin.com/in/muhammadbilaldevops/)
 
-| Your goal | Start with |
+## 🎯 What it demonstrates
+
+- Production-style Next.js frontend + FastAPI backend monorepo.
+- Local-first PDF, DOCX, spreadsheet, image, and OCR intelligence.
+- RAG pipeline: load → normalize → chunk → retrieve → cite → answer.
+- Gemini streaming with an Ollama local-model alternative.
+- Typed agent routing, allowlisted tools, durable approvals, and security boundaries.
+- On-device Whisper transcription for microphone questions.
+- Responsive, colorful Gemini-inspired chat UX with multi-file upload and Thinking states.
+
+## 🧭 Architecture
+
+```mermaid
+flowchart LR
+ B[🌐 Browser] --> V[⚡ Vercel Next.js]
+ V --> M{Mode}
+ M -->|No API URL| L[Browser workspace<br/>localStorage + OCR + source QA]
+ M -->|API URL| A[🚀 Render FastAPI]
+ A --> S[Supervisor]
+ S --> R[RAG retrieval + citations]
+ S --> N[Analytics]
+ S --> T[Tools + approvals]
+ S --> G{Model}
+ G --> Gemini[Gemini API]
+ G --> Ollama[Ollama]
+ T --> DB[(SQLite / store)]
+```
+
+## 🌈 Features
+
+| Feature | Implementation |
 | --- | --- |
-| Try it without installing anything | The browser demo linked in the repository description / deployment notes |
-| Run it with your own documents | The Docker quick start below |
-| Review the engineering | `src/localops/orchestration/graph.py`, `src/localops/tools/registry.py`, and `tests/` |
-| Check what has actually been verified | [Validation report](docs/validation.md) |
+| 💬 Chat | Next.js, React, TypeScript, Tailwind, Radix/Base UI, Lucide, responsive dark UI. |
+| 📎 Multi-file upload | Up to 10 files per batch, progress, partial-error handling, local persistence. |
+| 📄 Résumé QA | PDF.js text extraction, page citations, evidence-ranked answers, no invented facts. |
+| 🧾 Scanned PDFs/images | Canvas rendering + Tesseract.js English OCR. |
+| 📝 Word | Mammoth raw-text extraction from DOCX. |
+| 📊 Data | ExcelJS XLSX reader, quoted CSV parser, normalized JSON, analytics tables/charts. |
+| 🎙️ Voice | MediaRecorder → 16 kHz audio → Transformers.js/ONNX Whisper Tiny English in browser. |
+| 🔊 Read aloud | Browser SpeechSynthesis with stop/error handling. |
+| 🧠 Suggestions | Questions generated from the actual uploaded document or résumé. |
+| ✅ Operations | Tasks/reports/actions are proposed and require durable human approval. |
+| 🔒 Privacy | Browser mode keeps files and conversations in localStorage; no default telemetry. |
 
-**Project status:** an implemented, tested local baseline with optional model integrations. This is not a claim that every item in the 88-section specification is production-certified. Live model quality, voice quality, operating-system isolation, and large-scale performance need their own validation. The [coverage matrix](docs/requirements-coverage.md) records the gaps explicitly.
+## 🧱 Technologies
 
-## Three honest runtime modes
+**Frontend:** Next.js 16, React 19, TypeScript, Tailwind CSS, Radix UI, Base UI, shadcn-style components, PDF.js, Mammoth, ExcelJS, Tesseract.js, Transformers.js, ONNX WebAssembly, localStorage.
 
-| Mode | Runs where | What it does | Model needed? |
-| --- | --- | --- | --- |
-| Browser demo | Your browser | Local text uploads, keyword excerpts, three CSV query templates, approvals, tasks, reports | No; never presented as LLM inference |
-| Local extractive | Your computer | FastAPI, LangGraph, SQLite, BM25, PDF/Office extraction, validated DuckDB, persistent approvals | No |
-| Local Ollama | Your computer | All local features plus generated, streamed answers using retrieved evidence | Yes; download explicitly |
+**Backend:** Python 3.12, FastAPI, Uvicorn, Pydantic, httpx, Gemini HTTP streaming client, Ollama client, SQLite/configured store, DuckDB validation boundaries.
 
-Semantic retrieval and reranking can be enabled with local BGE models and embedded Qdrant. Local voice adapters use Faster-Whisper and Kokoro ONNX. They are optional dependencies; see [models and voice](docs/voice.md).
+**AI architecture:** typed supervisor state, deterministic intent routing, RAG loaders/chunking/retriever, BM25/local vectors/fusion/reranking, citations, allowlisted tools, approval interrupts.
 
-## Quick start
+**Delivery:** pnpm workspaces, frozen lockfile, Docker Compose, Vercel, Render, pytest, Ruff, mypy, Playwright, axe accessibility checks, golden evaluations.
 
-Install Git and Docker Desktop (or Docker Engine with Compose). Then:
+## 🗂️ Repository map
+
+| Path | Responsibility |
+| --- | --- |
+| `apps/web/app/page.tsx` | Main chat UI, navigation, upload flow, suggestions, sources, actions. |
+| `apps/web/app/globals.css` | Visual system, gradients, responsive layout, states, composer. |
+| `apps/web/components/voice-controls.tsx` | Recording, local transcription handoff, read-aloud. |
+| `apps/web/lib/browser-workspace.ts` | Browser storage, upload routing, chat, analytics, actions, migration. |
+| `apps/web/lib/document-readers.ts` | PDF, DOCX, XLSX, CSV, JSON, images, OCR. |
+| `apps/web/lib/document-answers.ts` | Ranking, résumé matching, citations, suggestions, no-evidence responses. |
+| `apps/web/lib/local-speech.ts` | Decode, resample, silence checks, Whisper model loading. |
+| `apps/web/lib/api.ts` | Typed backend HTTP adapter and health checks. |
+| `apps/web/public/document-assets/` | PDF.js, Tesseract, OCR data, fonts, maps, and WASM assets. |
+| `apps/api/main.py` | FastAPI app, middleware, CORS, route registration. |
+| `apps/api/routes/` | Health, chat, documents, analytics, actions, settings, voice. |
+| `src/localops/config.py` | Environment and runtime configuration. |
+| `src/localops/agents/` | Typed agent state and supervisor routing. |
+| `src/localops/orchestration/graph.py` | Multi-step workflow and approval interrupts. |
+| `src/localops/rag/` | Loaders, chunking, retrieval, ranking, citations. |
+| `src/localops/llm/` | Gemini and Ollama adapters. |
+| `src/localops/tools/registry.py` | Validated allowlisted operational tools. |
+| `src/localops/security/` | Validation, path boundaries, body limits. |
+| `src/localops/voice/` | Optional server-side speech adapters. |
+| `tests/` | Unit, API, integration, contract, security, evaluation. |
+| `render.yaml` / `apps/web/vercel.json` | Render and Vercel deployment definitions. |
+
+## 🚀 Run locally
 
 ```bash
-git clone https://github.com/muhammadbilaldevops/Ai-Agent-Industry-Level-Project.git
-cd Ai-Agent-Industry-Level-Project
+git clone https://github.com/muhammadbilaldevops/business-ai-agent.git
+cd business-ai-agent
 docker compose up --build
 ```
 
-Open **http://localhost:8000**. Open **http://localhost:8000/docs** for the API explorer. The first image build needs internet for dependencies; ordinary extractive runtime does not.
+Open `http://localhost:8000` and `http://localhost:8000/docs`.
 
-The default is **local extractive mode**, so you can upload files and verify the workflows without a GPU or model download. To load the included synthetic company files, open another terminal:
-
-```bash
-docker compose exec localops python scripts/seed_demo.py
-```
-
-Try:
-
-1. “What is our refund policy?” — inspect the source citation.
-2. “Analyze sales performance” — inspect the generated query, table, and chart.
-3. “Which products need restocking?” — inspect rows below their reorder levels.
-4. “Generate a sales report” — approve it, then download the report.
-5. Upload your own documents and repeat with questions relevant to them.
-
-Stop with `docker compose down`. Named volumes retain your files and conversations. Do not use `down -v` unless you intend to remove that data.
-
-### Enable generated answers
-
-Copy `.env.example` to `.env`, then set `LOCALOPS_MODE=ollama` and choose `LOCALOPS_MODEL`. Start the optional model service and explicitly download the configured model:
-
-```bash
-docker compose --profile ai up -d ollama
-docker compose exec ollama ollama pull llama3.1:8b
-docker compose --profile ai up --build -d
-```
-
-Model identifiers are configurable. Do not select Ollama cloud models. The default 8B model needs substantially more memory than extractive mode; choose a smaller local model if your hardware cannot run it. Model images and model weights are not fully pinned by digest in this release.
-
-### Develop without Docker
-
-Requires **Python 3.12+**, **Node.js 22**, and the pinned pnpm version from `apps/web/package.json`.
+Native setup requires Python 3.12+, Node.js 22+, and pnpm 11.25.0:
 
 ```bash
 python -m venv .venv
-# macOS / Linux:
-source .venv/bin/activate
-# Windows PowerShell instead: .venv\Scripts\Activate.ps1
 python -m pip install -r requirements-dev.txt
 python -m pip install --no-deps -e .
 corepack enable
 corepack prepare pnpm@11.25.0 --activate
-cd apps/web
-pnpm install --frozen-lockfile
-cd ../..
+cd apps/web && pnpm install --frozen-lockfile && cd ../..
 node scripts/build-web.mjs
 uvicorn apps.api.main:app --host 127.0.0.1 --port 8000
 ```
 
-The built web app and API share one origin. You do not need to configure CORS. Run `python scripts/seed_demo.py` in another activated terminal if you want samples. See [troubleshooting](docs/getting-started.md#troubleshooting).
+## ☁️ Deploy
 
-## How a request works
+### Vercel frontend
 
-```mermaid
-flowchart TD
-  U[User request] --> S[Supervisor]
-  S --> K[Knowledge agent]
-  S --> D[Analyst agent]
-  S --> A[Action agent]
-  K --> R[Retrieve and cite evidence]
-  D --> Q[Validated DuckDB query]
-  Q --> A
-  A --> H[Persist approval interrupt]
-  H --> C{Human decision}
-  C -->|Approve| T[Atomic local tool execution]
-  C -->|Reject| X[No action]
-  R --> M[Conversation history]
-  T --> M
+```text
+Root Directory: apps/web
+Framework: Other
+Install: pnpm install --frozen-lockfile
+Build: pnpm run build
+Output: out
 ```
 
-The analytics-to-action edge is used for multi-step report requests. Ordinary analysis returns directly. The model never owns approval or permission decisions.
+Optional variable: `NEXT_PUBLIC_API_BASE_URL=https://your-render-service.onrender.com`.
 
-## Repository guide
+### Render backend
 
-| Directory | Responsibility |
-| --- | --- |
-| `apps/api/` | FastAPI composition, request boundaries, and endpoint handlers |
-| `apps/web/` | Next.js + TypeScript UI, Shadcn controls, browser demo, and local API adapter |
-| `src/localops/agents/` | Typed state and deterministic intent routing |
-| `src/localops/orchestration/` | LangGraph workflow and durable approval interrupts |
-| `src/localops/rag/` | Extraction, chunking, BM25, local vectors, fusion, reranking, citations |
-| `src/localops/llm/` | Local Ollama streaming, retries, health, circuit breaker |
-| `src/localops/tools/` | Validated, allowlisted tasks and reports with atomic approval |
-| `src/localops/security/` | File validation, workspace paths, request size limits |
-| `src/localops/voice/` | Optional local STT/TTS adapters |
-| `src/localops/evaluation/` | Reproducible routing and retrieval evaluation |
-| `tests/` | Unit, API, integration, contract, security, and evaluation tests |
-| `apps/web/tests/e2e/` | Playwright workflows and axe accessibility checks |
-| `data/samples/` | Synthetic files for a reproducible recruiter walkthrough |
-| `docs/` | Design, tradeoffs, validation evidence, limitations, and setup |
+Create a Blueprint from this repository. `render.yaml` defines the FastAPI service. Set `LOCALOPS_API_KEY` and `GEMINI_API_KEY`, then add the Render URL to Vercel as `NEXT_PUBLIC_API_BASE_URL` and redeploy.
 
-## Quality checks
+## 🧪 Quality checks
 
 ```bash
 pytest -q
@@ -137,30 +137,22 @@ ruff check src apps/api tests scripts
 ruff format --check src apps/api tests scripts
 mypy
 python scripts/run_evaluation.py
-cd apps/web
-pnpm exec tsc --noEmit
-pnpm exec playwright install chromium
-pnpm exec playwright test
+cd apps/web && pnpm exec tsc --noEmit && pnpm exec playwright install chromium && pnpm exec playwright test
 ```
 
-The E2E suite starts the local API against the built `dist/` website. Build the website first. GitHub Actions additionally runs the container build and startup check. TypeScript is strict; Python typing currently covers selected core modules, not the entire backend.
+Validation covers API contracts, routing, retrieval, workflows, security boundaries, accessibility, multi-file PDF/DOCX upload, résumé questions, scanned-PDF OCR, CSV/XLSX handling, citations, and thinking states.
 
-## Safety boundaries
+## 🔐 Safety and runtime modes
 
-- Single-operator local workspace; no multi-tenant authorization claims.
-- No unrestricted shell, arbitrary Python, or external messaging tools.
-- SQL AST allowlist, uploaded-table restriction, disabled DuckDB external access, memory/result limits, and a killable query process.
-- Every task/report write requires a durable human decision; repeated decisions cannot duplicate execution.
-- Retrieved text is untrusted evidence. Prompt wording is not a complete prompt-injection defense; tool permissions are enforced separately.
-- No default cloud inference or telemetry. Bootstrap downloads are explicit.
-- Logs record IDs and events, not full prompts. Stored conversations and documents are not encrypted at rest; protect the local machine and backups.
+| Mode | AI generation | Persistence |
+| --- | --- | --- |
+| Browser workspace | Deterministic evidence answers + local Whisper | Browser localStorage |
+| Local extractive | No model required | Local store |
+| Local Ollama | Generated streamed answers | Local store |
+| Hosted Gemini | Gemini-generated answers | Configured backend store |
 
-## Deployment
+Uploaded text is untrusted evidence. Actions require human approval. Requests, files, paths, queries, and results are bounded. Browser mode does not send files by default. Local documents and conversations are not encrypted at rest. Hosted Gemini requires a deployed Render backend and a valid Gemini key; without the API URL the Vercel app remains a browser document assistant.
 
-The Sites deployment is a **browser demo**, not a GPU inference server. Visitors can personalize it with supported files on their own device. The full local stack is delivered through this repository. A public full-model deployment would need a suitable server, authentication, TLS, resource quotas, and operational review.
+## 🤝 Contributing and license
 
-A custom domain such as `muhammadbilalaiagent.dev` is not registered by this repository. Ownership and registrar/DNS access are needed before it can be connected. See [deployment notes](docs/deployment.md).
-
-## Contributing
-
-Read [CONTRIBUTING.md](CONTRIBUTING.md), run the focused tests for your change, and include evidence for any claimed improvement. Prefer useful business capabilities and measured reliability over inflated feature counts.
+Read [CONTRIBUTING.md](CONTRIBUTING.md), run focused tests, and include evidence for quality claims. See [LICENSE](LICENSE).
