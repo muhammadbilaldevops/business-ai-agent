@@ -18,6 +18,10 @@ Built by **Muhammad Bilal**. Upload a résumé, policy, report, spreadsheet, or 
 - On-device Whisper transcription for microphone questions.
 - Responsive, colorful Gemini-inspired chat UX with multi-file upload and Thinking states.
 
+## 🛣️ Future roadmap
+
+The detailed, implementation-ready product roadmap is in [docs/FUTURE_IMPROVEMENTS.md](docs/FUTURE_IMPROVEMENTS.md). It covers feedback loops, confidence and citations, saved workspaces, exports/templates, semantic search, document comparison, team roles, reminders, integrations, audit logs, and security requirements.
+
 ## 🧭 Architecture
 
 ```text
