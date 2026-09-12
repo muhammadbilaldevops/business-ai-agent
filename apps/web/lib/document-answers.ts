@@ -6,6 +6,7 @@ function chunks(text: string) {
  for(const line of lines){ if(part.length+line.length>650 && part){result.push(part);part='';} if(line.length>900){for(let i=0;i<line.length;i+=600)result.push(line.slice(i,i+750));}else part+=(part?'\n':'')+line; } if(part)result.push(part); return result;
 }
 const isContinuation = (question: string) => /^(?:continue|go on|keep going|more|tell me more|show more|next)(?:\s*[.!?])?$/i.test(question.trim());
+const isAcknowledgement = (question: string) => /^(?:nice|thanks|thank you|great|good|okay|ok|got it|cool|awesome)(?:\s*(?:thanks|thank you))?[.!?]*$/i.test(question.trim());
 function focusedExcerpt(text: string, keywords: string[]) {
  const lines=text.split(/\n+/).map(line=>line.trim()).filter(Boolean);
  const relevant=lines.filter(line=>keywords.some(word=>line.toLowerCase().includes(word)));
@@ -25,6 +26,7 @@ export function suggestQuestions(documents: Source[], datasets: Dataset[]) {
 }
 export function answerDocuments(question:string, documents:Source[], history:{role:string;content:string;metadata?:{citations?:Citation[]}}[]=[]):{answer:string;citations:Citation[]} {
  if(!documents.length)return {answer:'Add your files using the + button, then ask about their contents. I will show the sources behind each answer.',citations:[]};
+ if(isAcknowledgement(question))return {answer:'You’re welcome. Ask another question about your uploaded files whenever you’re ready.',citations:[]};
  const continuing=isContinuation(question);
  const previousUser=[...history].reverse().find(message=>message.role==='user')?.content;
  const q=(continuing && previousUser ? previousUser : question).toLowerCase();
