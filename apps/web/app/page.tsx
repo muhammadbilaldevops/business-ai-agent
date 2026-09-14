@@ -76,6 +76,7 @@ import {
 import { LocalOpsClient } from "@/lib/api";
 import { suggestQuestions } from "@/lib/document-answers";
 import { browserWorkspace } from "@/lib/browser-workspace";
+import { readChats, saveChat, deleteChat, type SavedChat } from "@/lib/chat-history";
 import type {
   Snapshot,
   Message,
@@ -147,6 +148,8 @@ function Text({ text }: { text: string }) {
   );
 }
 export default function Home() {
+  const [chats, setChats] = useState<SavedChat[]>([]);
+  const [chatSearch, setChatSearch] = useState("");
   const [view, setView] = useState("Workspace"),
     [local, setLocal] = useState(false),
     [token, setToken] = useState(""),
@@ -251,6 +254,13 @@ export default function Home() {
           setName(prefs.workspace_name);
           setHealth(h);
           setMessages(history);
+          const saved = readChats();
+          const current = saved.find(c => c.id === conversation.current);
+          if (current) {
+            setMessages(current.messages);
+            if (!client.local) browserWorkspace.restoreChat(current.messages);
+          }
+          setChats(current || !history.length ? saved : saveChat(conversation.current, history));
           setSelected(data.datasets[0]?.id || "");
         }
       } catch (e) {
@@ -289,6 +299,8 @@ export default function Home() {
     lastQuestion.current = q;
     abort.current = new AbortController();
     setMessages((m) => [...m, { role: "user", content: q }]);
+    const pendingMessages: Message[] = [...messages, { role: 'user', content: q }];
+    try { setChats(saveChat(conversation.current, pendingMessages)); } catch (e) { onError(e); }
     try {
       const answer = await client.chat(
         q,
@@ -302,6 +314,7 @@ export default function Home() {
         { role: "assistant", content: answer.answer, metadata: answer },
       ]);
       setAttachments([]);
+      try { setChats(saveChat(conversation.current, [...pendingMessages, { role: 'assistant', content: answer.answer, metadata: answer }])); } catch (e) { onError(e); }
       await refresh();
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError")
@@ -354,7 +367,8 @@ export default function Home() {
     });
   }
   async function newChat() {
-    if (sending) return;
+    if (sending || busy) return;
+    try { if (messages.length) setChats(saveChat(conversation.current, messages)); } catch (e) { onError(e); return; }
     conversation.current = crypto.randomUUID();
     localStorage.setItem("localops-conversation", conversation.current);
     if (!local) browserWorkspace.clearChat();
@@ -364,6 +378,16 @@ export default function Home() {
     setView("Workspace");
     setError("");
     setInfo("");
+  }
+  function openChat(chat: SavedChat) {
+    if (sending || busy) return;
+    try {
+      if (!local) browserWorkspace.restoreChat(chat.messages);
+      localStorage.setItem('localops-conversation', chat.id);
+      conversation.current = chat.id;
+      setMessages(chat.messages); setInput(''); setAttachments([]);
+      setView('Workspace'); setError(''); setInfo('');
+    } catch (e) { onError(e); }
   }
   async function preview(id: string) {
     await perform(async () => {
@@ -476,6 +500,25 @@ export default function Home() {
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
+          <section className="saved-chats" aria-label="Saved chats">
+            <h2>Recent chats</h2>
+            <Input aria-label="Search chats" placeholder="Search chats…" value={chatSearch} onChange={e => setChatSearch(e.target.value)} />
+            <p>Saved in this browser, including after closing it.</p>
+            {chats.filter(c => (c.title + ' ' + c.messages.map(m => m.content).join(' ')).toLowerCase().includes(chatSearch.toLowerCase())).map(chat => <div className="saved-chat-row" key={chat.id}>
+              <button disabled={sending || busy} aria-current={conversation.current === chat.id ? 'page' : undefined} onClick={() => openChat(chat)} title={chat.title}><span>{chat.title}</span><small>{chat.messages.length} messages · {new Date(chat.updatedAt).toLocaleDateString()}</small></button>
+              <button aria-label={'Export chat ' + chat.title} onClick={() => download(chat.title.replace(/[^a-z0-9 -]/gi, '').slice(0, 50) + '.md', chat.messages.map(m => '## ' + m.role + '\n\n' + m.content).join('\n\n'))}><Download size={14}/></button>
+              <button disabled={sending || busy} aria-label={'Delete chat ' + chat.title} onClick={() => setConfirm({label: 'Delete this saved chat?', action: async () => {
+                if (conversation.current === chat.id) {
+                  if (!local) browserWorkspace.clearChat();
+                  conversation.current = crypto.randomUUID();
+                  localStorage.setItem('localops-conversation', conversation.current);
+                  setMessages([]); setInput('');
+                }
+                setChats(deleteChat(chat.id));
+              }})}><Trash2 size={14}/></button>
+            </div>)}
+            {!chats.length && <p>Your conversations will appear here.</p>}
+          </section>
         </SidebarContent>
         <SidebarFooter>
           <a className="author" href={REPO} target="_blank" rel="noreferrer">

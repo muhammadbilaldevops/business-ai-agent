@@ -65,6 +65,9 @@ export const browserWorkspace = {
   messages() {
     return structuredClone(state().messages);
   },
+  restoreChat(messages: Message[]) {
+    change(s => { s.messages = structuredClone(messages); });
+  },
   settings() {
     return { workspace_name: state().workspace_name, mode: "document-mode" };
   },

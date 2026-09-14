@@ -1613,3 +1613,13 @@ select {
 [data-slot=sidebar-menu-button][data-active=true]{background:linear-gradient(100deg,#29354f,#343046)!important;color:#cbdcff!important}.mode-badge{background:#263044;color:#b9d1fb}.new-chat{border:1px solid #3b4151!important;background:linear-gradient(110deg,#293144,#302d3f)!important}
 @media(max-width:767px){.welcome{padding-bottom:28px;min-height:235px}.welcome-orbit{width:48px;height:48px;margin-bottom:20px}.welcome .welcome-hint{font-size:14px;margin-top:13px}.chat-panel:has(.welcome){padding-bottom:6vh}}
 .usage-guide{max-width:660px;align-self:center;width:100%;margin:20px 0 0;font-size:14px;color:#abb7cc;text-align:left}.usage-guide summary{cursor:pointer;text-align:center;color:#b9c9ee;font-size:13px;list-style-position:inside}.usage-guide ol{list-style:decimal;padding:14px 20px 0 36px;line-height:1.65}.usage-guide li{padding:5px 0}.usage-guide strong{color:#d9e4f9;font-weight:500}.usage-guide p{font-size:12px;line-height:1.6;padding:4px 20px;color:#9ba8be}.usage-guide[open]{background:#1c2230;border:1px solid #303d55;border-radius:18px;padding:16px 0}
+/* Persistent conversation navigation */
+.saved-chats { padding: 12px; }
+.saved-chats h2 { font-size: 14px; margin-bottom: 10px; }
+.saved-chats p { font-size: 11px; color: #9ca3af; margin: 8px 0; }
+.saved-chat-row { display: flex; align-items: center; gap: 4px; margin: 6px 0; }
+.saved-chat-row button { padding: 7px; border-radius: 8px; cursor: pointer; }
+.saved-chat-row button:first-child { min-width: 0; flex: 1; text-align: left; }
+.saved-chat-row span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.saved-chat-row small { font-size: 10px; color: #9ca3af; }
+.saved-chat-row button:hover, .saved-chat-row button[aria-current] { background: #283246; }
