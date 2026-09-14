@@ -1,6 +1,6 @@
 /** Browser-only document workspace. Never calls a language model or uploads files. */
 import { readDocument, readSpreadsheet } from './document-readers';
-import { answerDocuments } from './document-answers';
+import { answerDocumentsSemantic } from './document-answers';
 import type { Snapshot, Answer, Message, Analysis } from "./localops-types";
 const KEY = "business-ai-workspace-v3";
 type State = Snapshot & { messages: Message[]; workspace_name: string };
@@ -160,7 +160,7 @@ export const browserWorkspace = {
       "Document mode supports the three example queries shown below. Run the local app for validated DuckDB SQL.",
     );
   },
-  chat(query: string, datasetId?: string): Answer {
+  async chat(query: string, datasetId?: string, signal?: AbortSignal): Promise<Answer> {
     const q = query.toLowerCase();
     const result: Answer = {
       answer: "",
@@ -169,7 +169,7 @@ export const browserWorkspace = {
       conversation_id: "browser",
       mode: "document-mode",
     };
-    const analyticsIntent = /\b(sales|inventory|restock|revenue|dataset|analy[sz]e|stock|rows|columns)\b/.test(q) || !!datasetId;
+    const analyticsIntent = /\b(sales|inventory|restock|revenue|dataset|stock|rows|columns)\b/.test(q) || !!datasetId;
     const analytical = state().datasets.length > 0 && analyticsIntent;
     const action =
       /\b(create|prepare|generate|make|draft)\b.*\b(task|report|follow-up)\b/.test(
@@ -231,11 +231,12 @@ export const browserWorkspace = {
         "Review the proposed action in Approvals. Nothing has been executed yet.";
       result.trajectory.push("action_agent");
     } else if (!workspaceIsEmpty && !analytical && !analyticsIntent) {
-      const grounded = answerDocuments(query, state().documents, state().messages);
+      const grounded = await answerDocumentsSemantic(query, state().documents, state().messages, signal);
       result.answer = grounded.answer;
       result.citations = grounded.citations;
       result.trajectory.push("knowledge_agent");
     }
+    signal?.throwIfAborted();
     change((s) => {
       s.messages.push(
         { role: "user", content: query },

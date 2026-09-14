@@ -76,7 +76,8 @@ export class LocalOpsClient {
       // Yield to the browser so the pending state paints before local processing.
       await new Promise<void>(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
       if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-      const answer = browserWorkspace.chat(message, datasetId);
+      onToken("Searching document meaning… First use may download the local search model.");
+      const answer = await browserWorkspace.chat(message, datasetId, signal);
       if (signal.aborted) throw new DOMException("Aborted", "AbortError");
       return answer;
     }

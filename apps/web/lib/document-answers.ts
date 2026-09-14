@@ -14,9 +14,27 @@ const semanticGroups: Record<string, string[]> = {
 function enrichTerms(words: string[]) {
  return [...new Set(words.flatMap(word => [word, ...(semanticGroups[word] || [])]))];
 }
-function chunks(text: string) {
- const lines=text.split(/\n+/).map(s=>s.trim()).filter(Boolean); const result:string[]=[];let part='';
- for(const line of lines){ if(part.length+line.length>650 && part){result.push(part);part='';} if(line.length>900){for(let i=0;i<line.length;i+=600)result.push(line.slice(i,i+750));}else part+=(part?'\n':'')+line; } if(part)result.push(part); return result;
+export function chunks(text: string) {
+ const result: {text:string;page?:number;section?:string}[]=[];
+ let page:number|undefined, section:string|undefined, part='';
+ const flush=()=>{if(part.trim())result.push({text:part.trim(),page,section});part='';};
+ for(const raw of text.split(/\n+/)) {
+  const line=raw.trim(); if(!line)continue;
+  const marker=line.match(/^\[Page\s+(\d+)\]$/i);
+  if(marker){flush();page=Number(marker[1]);continue;}
+  if(/^#{1,6}\s/.test(line)||/^(skills|technical skills|experience|education|projects|certifications|professional experience|summary)$/i.test(line)) {
+   flush();section=line.replace(/^#+\s*/, '');continue;
+  }
+  for(const sentence of line.match(/[^.!?]+(?:[.!?](?=\s|$)|$)/g)||[line]) {
+   if(part.length+sentence.length>500)flush();
+   for(let start=0;start<sentence.length;start+=500){
+    const piece=sentence.slice(start,start+500).trim();
+    if(part.length+piece.length>600)flush();
+    part+=(part?'\n':'')+piece;
+   }
+  }
+ }
+ flush();return result;
 }
 const isContinuation = (question: string) => /^(?:continue|go on|keep going|more|tell me more|show more|next)(?:\s*[.!?])?$/i.test(question.trim());
 const isAcknowledgement = (question: string) => /^(?:nice|thanks|thank you|great|good|okay|ok|got it|cool|awesome|wow|amazing|perfect|excellent|helpful|lovely)(?:\s*(?:thanks|thank you))?[.!?]*$/i.test(question.trim());
@@ -38,7 +56,7 @@ export function suggestQuestions(documents: Source[], datasets: Dataset[]) {
  }
  const data=datasets[datasets.length-1];return data ? [`Analyze ${data.filename}`,`Show the first rows of ${data.filename}`,`What columns are in ${data.filename}?`] : [];
 }
-export function answerDocuments(question:string, documents:Source[], history:{role:string;content:string;metadata?:{citations?:Citation[]}}[]=[]):{answer:string;citations:Citation[]} {
+export function answerDocuments(question:string, documents:Source[], history:{role:string;content:string;metadata?:{citations?:Citation[]}}[]=[], similarities:Map<string,number>=new Map()):{answer:string;citations:Citation[]} {
  if(!documents.length)return {answer:'📎 I’d be happy to help! Please add a document with the + button first, then ask me anything about it. I’ll keep my answers tied to your file.',citations:[]};
  if(isAcknowledgement(question))return {answer:'😊 Glad that helped! Whenever you’re ready, ask me anything else about your uploaded files.',citations:[]};
  if(isGreeting(question))return {answer:'👋 Hi! I’m here to help you explore your uploaded files. What would you like to know?',citations:[]};
@@ -54,13 +72,19 @@ export function answerDocuments(question:string, documents:Source[], history:{ro
  const isExperience=/experience|employment|work history/.test(q);
  const isEducation=/education|degree|university|college/.test(q);
  const isProjects=/projects|achievements?|accomplishments?/.test(q);
- const isNumbers=/dates and numbers|date|number|salary|year|month/.test(q);
+
  const baseTerms=terms(named.reduce((s,d)=>s.replace(d.filename.toLowerCase(),''),q));
  const expanded=enrichTerms([...baseTerms,...(isSkills?['skills','technical','tools','technologies','programming','languages','frameworks']:[]),...(isExperience?['experience','engineer','developer','employment','worked','intern']:[]),...(isEducation?['education','university','degree','bachelor','master','college']:[]),...(isProjects?['projects','built','developed','created','achieved','deployed']:[])]);
- const all=docs.flatMap(d=>chunks(d.content||'').map((text,index)=>{
-  const lower=text.toLowerCase();let score=expanded.reduce((sum,t)=>sum+(lower.includes(t)?1:0),0);
-  if(isNumbers && /\d/.test(text))score+=2;
-  return {document_id:d.id,filename:d.filename,excerpt:text,score,index};
+ const all=docs.flatMap(d=>chunks(d.content||'').map((chunk,index)=>{
+  const text=chunk.text; const lower=((chunk.section||'')+' '+text).toLowerCase();
+  const words=new Set(terms(lower));
+  const matches=expanded.filter(t=>t.includes(' ')?lower.includes(t):words.has(t));
+  const lexical=matches.length/Math.max(1,expanded.length);
+  const semantic=similarities.get(d.id+':'+index)||0;
+  const sensitive=baseTerms.filter(t=>/salary|compensation|availability|phone|email/.test(t));
+  const supported=!sensitive.length||sensitive.some(t=>lower.includes(t));
+  const score=supported&&(matches.length>0||semantic>=0.42)?lexical*0.55+Math.max(0,semantic)*0.45:0;
+  return {document_id:d.id,filename:d.filename,excerpt:text,score,index,page:chunk.page,section:chunk.section};
  }));
  const bestScore=Math.max(0,...all.map(c=>c.score));
  const priorCitations=history.flatMap(message=>message.metadata?.citations||[]);
@@ -76,4 +100,20 @@ export function answerDocuments(question:string, documents:Source[], history:{ro
  if(!selected.length)return {answer:'🔍 I couldn’t spot that in the uploaded files. Could you try phrasing the question a little differently, or add the file that contains it? I’ll stick to what your documents actually say.',citations:[]};
  const intro=continuing?'Here is the next relevant detail from the same document:':isSummary?'Here is a source-based overview of your document:':isSkills?'These passages list the relevant skills and technologies:':isExperience?'Here is the experience recorded in your document:':isProjects?'These are the projects and achievements I found:':'I found the information most relevant to your question:';
  return {answer:intro+'\n\n'+selected.map((c,i)=>`**${c.filename} [${i+1}]**\n\n${focusedExcerpt(c.excerpt,expanded)}`).join('\n\n'),citations:selected.map(c=>({...c,chunk_index:c.index,score:c.score}))};
+}
+
+export async function answerDocumentsSemantic(question:string, documents:Source[], history:Parameters<typeof answerDocuments>[2]=[], signal?:AbortSignal) {
+ if(!documents.length||isAcknowledgement(question)||isGreeting(question))return answerDocuments(question,documents,history);
+ const query=isContinuation(question)?[...history].reverse().find(m=>m.role==='user')?.content||question:question;
+ const named=documents.filter(d=>query.toLowerCase().includes(d.filename.toLowerCase()));
+ const corpus=(named.length?named:documents).flatMap(d=>chunks(d.content||'').map((chunk,index)=>({key:d.id+':'+index,text:(chunk.section?chunk.section+'\n':'')+chunk.text})));
+ try {
+  const {semanticScores}=await import('./semantic-search');
+  const scores=await semanticScores(query,corpus.map(c=>c.text),signal);
+  return answerDocuments(question,documents,history,new Map(corpus.map((c,i)=>[c.key,scores[i]])));
+ } catch(error) {
+  if(signal?.aborted)throw error;
+  const fallback=answerDocuments(question,documents,history);
+  return {...fallback,answer:fallback.answer+'\n\n_Search used keyword matching because the semantic model could not load._'};
+ }
 }
