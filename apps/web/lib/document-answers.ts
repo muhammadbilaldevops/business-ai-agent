@@ -1,6 +1,19 @@
 import type { Source, Dataset, Citation } from './localops-types';
 const ignored = new Set('what which who where when why how is are was were am my me your you our the a an and or for to of in on with from about can could would should please tell show give does do did has have file files document documents pdf resume cv summarize summary explain this that uploaded upload based'.split(' '));
 const terms = (text: string) => [...new Set((text.toLowerCase().match(/[\p{L}\p{N}+#.]+/gu) || []).filter(t=>t.length>1&&!ignored.has(t)))];
+const semanticGroups: Record<string, string[]> = {
+ cloud: ['aws', 'azure', 'gcp', 'google cloud', 'docker', 'kubernetes', 'terraform', 'devops', 'cloudflare'],
+ devops: ['ci/cd', 'github actions', 'jenkins', 'docker', 'kubernetes', 'terraform', 'aws', 'azure', 'linux'],
+ deployment: ['deploy', 'deployment', 'ci/cd', 'github actions', 'docker', 'kubernetes', 'terraform', 'release'],
+ frontend: ['react', 'next.js', 'typescript', 'javascript', 'tailwind', 'html', 'css'],
+ backend: ['python', 'fastapi', 'node.js', 'api', 'database', 'postgresql', 'sql'],
+ database: ['postgresql', 'mysql', 'mongodb', 'sqlite', 'sql', 'redis'],
+ leadership: ['lead', 'managed', 'mentored', 'team', 'stakeholder', 'owner'],
+ security: ['security', 'oauth', 'authentication', 'authorization', 'encryption', 'iam'],
+};
+function enrichTerms(words: string[]) {
+ return [...new Set(words.flatMap(word => [word, ...(semanticGroups[word] || [])]))];
+}
 function chunks(text: string) {
  const lines=text.split(/\n+/).map(s=>s.trim()).filter(Boolean); const result:string[]=[];let part='';
  for(const line of lines){ if(part.length+line.length>650 && part){result.push(part);part='';} if(line.length>900){for(let i=0;i<line.length;i+=600)result.push(line.slice(i,i+750));}else part+=(part?'\n':'')+line; } if(part)result.push(part); return result;
@@ -43,7 +56,7 @@ export function answerDocuments(question:string, documents:Source[], history:{ro
  const isProjects=/projects|achievements?|accomplishments?/.test(q);
  const isNumbers=/dates and numbers|date|number|salary|year|month/.test(q);
  const baseTerms=terms(named.reduce((s,d)=>s.replace(d.filename.toLowerCase(),''),q));
- const expanded=[...baseTerms,...(isSkills?['skills','technical','tools','technologies','programming','languages','frameworks']:[]),...(isExperience?['experience','engineer','developer','employment','worked','intern']:[]),...(isEducation?['education','university','degree','bachelor','master','college']:[]),...(isProjects?['projects','built','developed','created','achieved','deployed']:[])];
+ const expanded=enrichTerms([...baseTerms,...(isSkills?['skills','technical','tools','technologies','programming','languages','frameworks']:[]),...(isExperience?['experience','engineer','developer','employment','worked','intern']:[]),...(isEducation?['education','university','degree','bachelor','master','college']:[]),...(isProjects?['projects','built','developed','created','achieved','deployed']:[])]);
  const all=docs.flatMap(d=>chunks(d.content||'').map((text,index)=>{
   const lower=text.toLowerCase();let score=expanded.reduce((sum,t)=>sum+(lower.includes(t)?1:0),0);
   if(isNumbers && /\d/.test(text))score+=2;
@@ -58,9 +71,9 @@ export function answerDocuments(question:string, documents:Source[], history:{ro
   const next=priorPositions.map(previous=>all.find(c=>c.document_id===previous.document_id&&c.index===previous.index!+1)).filter(Boolean) as typeof all;
   selected=next.length ? next.slice(0,3) : all.filter(c=>c.score>0&&c.score>=bestScore*0.65).sort((a,b)=>b.score-a.score).slice(0,3);
  } else {
-  selected=isSummary?all.filter(c=>c.index<4).slice(0,4):all.filter(c=>c.score>0&&c.score>=bestScore*0.65).sort((a,b)=>b.score-a.score).slice(0,3);
+  selected=isSummary?all.filter(c=>c.index<3).slice(0,3):all.filter(c=>c.score>0&&c.score>=bestScore*0.65).sort((a,b)=>b.score-a.score).slice(0,2);
  }
  if(!selected.length)return {answer:'🔍 I couldn’t spot that in the uploaded files. Could you try phrasing the question a little differently, or add the file that contains it? I’ll stick to what your documents actually say.',citations:[]};
  const intro=continuing?'Here is the next relevant detail from the same document:':isSummary?'Here is a source-based overview of your document:':isSkills?'These passages list the relevant skills and technologies:':isExperience?'Here is the experience recorded in your document:':isProjects?'These are the projects and achievements I found:':'I found the information most relevant to your question:';
- return {answer:intro+'\n\n'+selected.map((c,i)=>`**${c.filename} [${i+1}]**\n\n${focusedExcerpt(c.excerpt,expanded)}`).join('\n\n'),citations:selected.map(c=>({...c,chunk_index:c.index}))};
+ return {answer:intro+'\n\n'+selected.map((c,i)=>`**${c.filename} [${i+1}]**\n\n${focusedExcerpt(c.excerpt,expanded)}`).join('\n\n'),citations:selected.map(c=>({...c,chunk_index:c.index,score:c.score}))};
 }
